@@ -16,5 +16,27 @@ CHIP PC {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+
+
+
+
+    b1 b0
+    0  0 = reset
+    0  1 = load
+    1  0 = inc
+    1  1 = none
+
+    //alternatively:
+    b1 b0
+    0  0 = 
+    0  1 = reset
+    1  0 = load
+    1  1 = inc
+
+    b0 = reset || (not(reset) and not(load) and inc)
+    b1 = load  || not(reset) and not(load) and inc
+
+    Mux4Way16 (a=false, b=in, c=incOut, d=registerOut, sel=sel, out=registerIn);
+    Register  (in=registerIn, load=load, out=registerOut, out=out);
+    Inc16     (in=registerOut, out=incOut);
 }
