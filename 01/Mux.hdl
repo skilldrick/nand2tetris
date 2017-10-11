@@ -14,5 +14,29 @@ CHIP Mux {
     OUT out;
 
     PARTS:
-    // Put your code here:
+    Not (in=sel, out=notSel);
+    And (a=a, b=notSel, out=w1);
+    And (a=b, b=sel, out=w2);
+    Or  (a=w1, b=w2, out=out);
 }
+
+/*
+if sel == 0 then ignore b
+if sel == 1 then ignore a
+
+
+or(
+w1 = a and not(sel)
+w2 = b and sel
+)
+
+a b s ns w1 w2 o
+0 0 0 1  0  0  0
+0 0 1 0  0  0  0
+0 1 0 1  0  0  0
+0 1 1 0  0  1  1
+1 0 0 1  1  0  1
+1 0 1 0  0  0  0
+1 1 0 1  1  0  1
+1 1 1 0  0  1  1
+*/

@@ -14,5 +14,41 @@ CHIP Or {
     OUT out;
 
     PARTS:
-    // Put your code here:
+    Not  (in=a, out=notA);
+    Not  (in=b, out=notB);
+    Nand (a=notA, b=notB, out=out);
 }
+
+/*
+not
+i o
+0 1
+1 0
+
+nand
+a b o
+0 0 1
+0 1 1
+1 0 1
+1 1 0
+
+and
+a b o
+0 0 0
+0 1 0
+1 0 0
+1 1 1
+
+or
+a b o
+0 0 0
+0 1 1
+1 0 1
+1 1 1
+
+a b notA notB o
+0 0  1    1   0
+0 1  1    0   1
+1 0  0    1   1
+1 1  0    0   1
+*/
