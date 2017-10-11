@@ -16,27 +16,12 @@ CHIP PC {
     OUT out[16];
 
     PARTS:
+    Register (in=resetMuxOut, load=true, out=registerOut, out=out);
+    Inc16    (in=registerOut, out=incOut);
 
-
-
-
-    b1 b0
-    0  0 = reset
-    0  1 = load
-    1  0 = inc
-    1  1 = none
-
-    //alternatively:
-    b1 b0
-    0  0 = 
-    0  1 = reset
-    1  0 = load
-    1  1 = inc
-
-    b0 = reset || (not(reset) and not(load) and inc)
-    b1 = load  || not(reset) and not(load) and inc
-
-    Mux4Way16 (a=false, b=in, c=incOut, d=registerOut, sel=sel, out=registerIn);
-    Register  (in=registerIn, load=load, out=registerOut, out=out);
-    Inc16     (in=registerOut, out=incOut);
+    // Mux16s are opposite order to if order, because last one to
+    // be true wins
+    Mux16    (a=registerOut, b=incOut, sel=inc, out=incMuxOut);
+    Mux16    (a=incMuxOut, b=in, sel=load, out=loadMuxOut);
+    Mux16    (a=loadMuxOut, b=false, sel=reset, out=resetMuxOut);
 }
