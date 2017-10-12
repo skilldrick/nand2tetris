@@ -27,5 +27,21 @@ CHIP Memory {
     OUT out[16];
 
     PARTS:
-    // Put your code here:
+
+    // route load input to correct chip based on upper two bits of address
+    // address[14]  & address[13]  = keyboard
+    // address[14]  & !address[13] = screen
+    // !address[14] & !address[13] = ram
+    DMux (in=load, sel=address[14], a=loadRam, b=noLoadRam);
+    DMux (in=noLoadRam, sel=address[13], a=loadScreen, b=loadKeyboard);
+
+    // RAM and Screen both receive in and relevant parts of address
+    RAM16K   (in=in, load=loadRam, address=address[0..13], out=ramOut);
+    // dropping msb means that address starts at 0
+    Screen   (in=in, load=loadScreen, address=address[0..12], out=screenOut);
+    Keyboard (out=keyboardOut);
+
+    // route correct chip output based on upper two bits of address
+    Mux16 (a=screenOut, b=keyboardOut, sel=address[13], out=keyboardScreenOut);
+    Mux16 (a=ramOut, b=keyboardScreenOut, sel=address[14], out=out);
 }
