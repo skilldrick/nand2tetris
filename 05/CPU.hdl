@@ -40,4 +40,53 @@ CHIP CPU {
 
     PARTS:
 
+    // if instruction[15] is true then C instruction else A instruction
+
+
+    Mux16 (a=instruction, b=aluOutput, sel=instruction[15], out=aRegisterIn);
+
+    /*
+      C instruction bits to destination:
+      05 04 03
+      d1 d2 d3
+      A  D  M
+    */
+
+    // A register should load for A instructions and for C instructions when d1 is set
+    Not(in=instruction[15], out=isAInstruction);
+    And(a=instruction[15], b=instruction[5], out=loadAFromALU);
+    Or (a=loadAFromALU, b=isAInstruction, out=loadA);
+    And(a=instruction[15], b=instruction[4], out=loadD);
+    And(a=instruction[15], b=instruction[3], out=writeM);
+
+    ARegister (in=aRegisterIn, load=loadA, out=aRegisterOut, out[0..14]=addressM);
+    DRegister (in=aluOutput, load=loadD, out=aluXin);
+
+    /*
+      set up Y input of ALU
+      this uses the (a) bit of the C instruction.
+      if this bit is false, Y input is the output of the A register
+      if this bit is true, Y input is the inM input
+    */
+    Mux16 (a=aRegisterOut, b=inM, sel=instruction[12], out=aluYin);
+
+    /*
+      C instruction bits to ALU input mapping:
+      11 10 09 08 07 06
+      c1 c2 c3 c4 c5 c6
+      zx nx zy ny f  no
+    */
+    ALU(
+      x=aluXin,
+      y=aluYin,
+      zx=instruction[11],
+      nx=instruction[10],
+      zy=instruction[9],
+      ny=instruction[8],
+      f=instruction[7],
+      no=instruction[6],
+      out=aluOutput,
+      zr=zrOut,
+      ng=ngOut
+    );
 }
