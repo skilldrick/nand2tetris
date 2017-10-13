@@ -1,0 +1,1 @@
+Run `npm link` to create a symlink to the executable defined in package.json.
