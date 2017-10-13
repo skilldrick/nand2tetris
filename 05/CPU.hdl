@@ -86,6 +86,7 @@ CHIP CPU {
       f=instruction[7],
       no=instruction[6],
       out=aluOutput,
+      out=outM,
       zr=resultWasZero,
       ng=resultWasNegative
     );
@@ -107,9 +108,10 @@ CHIP CPU {
     // jump when result was positive and positive jump bit set
     And (a=resultWasPositive, b=instruction[0], out=jumpPositive);
 
-    // jump when any of the jumps are true
+    // jump when any of the jumps are true and this is a C instruction
     Or (a=jumpNegative, b=jumpZero, out=shouldJump1);
-    Or (a=shouldJump1, b=jumpPositive, out=shouldJump);
+    Or (a=shouldJump1, b=jumpPositive, out=shouldJump2);
+    And (a=instruction[15], b=shouldJump2, out=shouldJump);
 
-    PC(in=aRegisterOut, load=shouldJump, inc=true, reset=reset, out[0..14]=pcOut);
+    PC(in=aRegisterOut, load=shouldJump, inc=true, reset=reset, out[0..14]=pc);
 }
