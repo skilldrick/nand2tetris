@@ -86,7 +86,30 @@ CHIP CPU {
       f=instruction[7],
       no=instruction[6],
       out=aluOutput,
-      zr=zrOut,
-      ng=ngOut
+      zr=resultWasZero,
+      ng=resultWasNegative
     );
+
+    // We already have bits for zero and negative result, so figure out positive
+    Or (a=resultWasZero, b=resultWasNegative, out=resultWasZeroOrNegative);
+    Not (in=resultWasZeroOrNegative, out=resultWasPositive);
+
+    /*
+      C instruction bits to jump mapping:
+      02 01 00
+      j1 j2 j3
+      lt zr gt
+    */
+    // jump when result was negative and negative jump bit set
+    And (a=resultWasNegative, b=instruction[2], out=jumpNegative);
+    // jump when result was zero and zero jump bit set
+    And (a=resultWasZero, b=instruction[1], out=jumpZero);
+    // jump when result was positive and positive jump bit set
+    And (a=resultWasPositive, b=instruction[0], out=jumpPositive);
+
+    // jump when any of the jumps are true
+    Or (a=jumpNegative, b=jumpZero, out=shouldJump1);
+    Or (a=shouldJump1, b=jumpPositive, out=shouldJump);
+
+    PC(in=aRegisterOut, load=shouldJump, inc=true, reset=reset, out[0..14]=pcOut);
 }
