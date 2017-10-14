@@ -1,5 +1,5 @@
 {
-  "name": "assembler",
+  "name": "programs",
   "version": "1.0.0",
   "description": "",
   "scripts": {
@@ -8,6 +8,7 @@
   "author": "",
   "license": "ISC",
   "bin": {
-    "hackassemble": "index.js"
+    "hackassemble": "assembler.js",
+    "hacktranslate": "translator.js"
   }
 }
