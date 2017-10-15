@@ -10,5 +10,8 @@
   "bin": {
     "hackassemble": "assembler.js",
     "hacktranslate": "translator.js"
+  },
+  "dependencies": {
+    "lodash": "^4.17.4"
   }
 }
