@@ -1,11 +1,13 @@
 #! /usr/bin/env node
 
 var fs = require('fs');
+var path = require('path');
 var _ = require('lodash');
 
-const inputFileName = process.argv[2];
-const outputFileName = inputFileName.replace(/\.\w+$/, '.asm');
-const file = fs.readFileSync(inputFileName, 'utf8');
+const inputFilePath = process.argv[2];
+const outputFilePath = inputFilePath.replace(/\.\w+$/, '.asm');
+const className = path.basename(inputFilePath).replace(/\.\w+$/, '');
+const file = fs.readFileSync(inputFilePath, 'utf8');
 
 // remove comments and whitespace
 const lines = file.split("\n").map(line => {
@@ -82,24 +84,140 @@ const operations = {
   lt:  () => comparisonOperation('JLT'),
 };
 
+const segments = {
+  local: '@LCL',
+  argument: '@ARG',
+  this: '@THIS',
+  that: '@THAT',
+}
+
+const pointers = {
+  0: '@THIS',
+  1: '@THAT',
+};
+
+function staticAddress(value) {
+  return '@' + className + '.' + value;
+}
+
 function push(type, value) {
-  if (type === 'constant') {
+  // push D register to stack
+  const pushD = [
+    '@SP',
+    'A=M',
+    'M=D',
+    '@SP',
+    'M=M+1'
+  ];
+
+  function pushSegment(SEGMENT) {
     return [
+      // Set D to *(SEGMENT + value)
       '@' + value,
       'D=A',
-      '@SP',
+      SEGMENT,
       'A=M',
-      'M=D',
-      '@SP',
-      'M=M+1'
-    ];
+      'A=A+D',
+      'D=M',
+    ].concat(pushD);
+  }
+
+  if (type === 'constant') {
+    return [
+      // set D to value
+      '@' + value,
+      'D=A',
+    ].concat(pushD);
+  } else if (type === 'static') {
+    return [
+      // set D to *@File.value
+      staticAddress(value),
+      'D=M',
+    ].concat(pushD);
+  } else if (type === 'temp') {
+    return [
+      // set D to *(value + 5)
+      '@' + value,
+      'D=A',
+      '@5', // temp memory offset
+      'A=D+A',
+      'D=M',
+    ].concat(pushD);
+  } else if (type === 'pointer') {
+    const POINTER = pointers[value];
+    return [
+      // Set D to *THIS or *THAT (depending on value == 0 or value == 1)
+      POINTER,
+      'D=M',
+    ].concat(pushD);
+  } else if (segments[type]) {
+    return pushSegment(segments[type]);
   } else {
     throw new Error(type + " not implemented yet");
   }
 }
 
 function pop(type, value) {
-  throw new Error(type + " not implemented yet");
+  const popD = [
+    // Decrement SP and load top value in D
+    '@SP',
+    'AM=M-1',
+    'D=M',
+  ];
+
+  function popSegment(SEGMENT) {
+    return [
+      // Update SEGMENT to SEGMENT + value
+      '@' + value,
+      'D=A',
+      SEGMENT,
+      'M=M+D',
+
+      ...popD,
+
+      // Store D in *SEGMENT
+      SEGMENT,
+      'A=M',
+      'M=D',
+
+      // Reset SEGMENT with SEGMENT - value
+      '@' + value,
+      'D=A',        // load `value` (SEGMENT offset) into D
+      SEGMENT,
+      'M=M-D',      // decrease SEGMENT by `value`
+    ];
+  }
+
+  if (type === 'static') {
+    return popD.concat([
+      // Store D in static address
+      staticAddress(value),
+
+      'M=D',
+    ]);
+  } else if (type === 'temp') {
+    return popD.concat([
+      // Store D in (value + 5)
+      '@' + value,
+      'A=A+1',
+      'A=A+1',
+      'A=A+1',
+      'A=A+1',
+      'A=A+1',
+      'M=D'
+    ]);
+  } else if (type === 'pointer') {
+    const POINTER = pointers[value];
+    return popD.concat([
+      // Store D in THIS or THAT (depending on value == 0 or value == 1)
+      POINTER,
+      'M=D',
+    ]);
+  } else if (segments[type]) {
+    return popSegment(segments[type]);
+  } else {
+    throw new Error(type + " not implemented yet");
+  }
 }
 
 function getOutput(tokens) {
@@ -132,5 +250,5 @@ const output = processed.join("\n");
 if (process.argv[3] == '--debug') {
   console.log(output);
 } else {
-  fs.writeFileSync(outputFileName, output);
+  fs.writeFileSync(outputFilePath, output);
 }
