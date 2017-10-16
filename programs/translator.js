@@ -157,13 +157,14 @@ function push(type, value) {
   }
 }
 
+const popD = [
+  // Decrement SP and load top value in D
+  '@SP',
+  'AM=M-1',
+  'D=M',
+];
+
 function pop(type, value) {
-  const popD = [
-    // Decrement SP and load top value in D
-    '@SP',
-    'AM=M-1',
-    'D=M',
-  ];
 
   if (type === 'static') {
     return popD.concat([
@@ -222,15 +223,24 @@ function pop(type, value) {
 }
 
 function label(label) {
-  throw new Error("label not implemented yet");
+  return [
+    "(" + label + ")"
+  ];
 }
 
 function goto(label) {
-  throw new Error("goto not implemented yet");
+  return [
+    "@" + label,
+    "0;JMP"
+  ];
 }
 
 function ifGoto(label) {
-  throw new Error("if-goto not implemented yet");
+  return [
+    ...popD,
+    "@" + label,
+    "D;JNE" // if D is true (-1) then it is not equal to 0
+  ];
 }
 
 function function_(name, nVars) {
