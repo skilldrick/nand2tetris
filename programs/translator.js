@@ -18,10 +18,22 @@ const lines = file.split("\n").map(line => {
 var labelIndex = 0;
 function generateNewLabel() {
   const id = ++labelIndex;
+  const label = "LABEL" + id;
 
   return {
-    address: "@LABEL" + id,
-    marker: "(LABEL" + id + ")"
+    address: "@" + label,
+    marker: "(" + label + ")"
+  };
+}
+
+var returnLabelIndex = 0;
+function generateNewReturnLabel() {
+  const id = ++returnLabelIndex;
+  const label = className + "$ret." + id;
+
+  return {
+    address: "@" + label,
+    marker: "(" + label + ")"
   };
 }
 
@@ -98,16 +110,16 @@ const pointers = {
   1: '@THAT',
 };
 
-function push(type, value) {
-  // push D register to stack
-  const pushD = [
-    '@SP',
-    'A=M',
-    'M=D',
-    '@SP',
-    'M=M+1'
-  ];
+// push D register to stack
+const pushD = [
+  '@SP',
+  'A=M',
+  'M=D',
+  '@SP',
+  'M=M+1'
+];
 
+function push(type, value) {
   if (type === 'constant') {
     return [
       // set D to value
@@ -165,7 +177,6 @@ const popD = [
 ];
 
 function pop(type, value) {
-
   if (type === 'static') {
     return popD.concat([
       // Store D in static address
@@ -248,7 +259,61 @@ function function_(name, nVars) {
 }
 
 function call(name, nArgs) {
-  throw new Error("call not implemented yet");
+  const returnLabel = generateNewReturnLabel();
+
+  function pushAddress(address) {
+    return [
+      address,
+      'D=A',
+      ...pushD,
+    ];
+  }
+
+  function pushValueAtAddress(address) {
+    return [
+      address,
+      'D=M',
+      ...pushD,
+    ];
+  }
+
+  return [
+    ...pushAddress(returnLabel.address),
+    ...pushValueAtAddress('@LCL'),
+    ...pushValueAtAddress('@ARG'),
+    ...pushValueAtAddress('@THIS'),
+    ...pushValueAtAddress('@THAT'),
+
+    // Set *ARG to equal *SP
+    '@SP',
+    'D=M',
+    '@ARG',
+    'M=D',
+
+    // Update @ARG to new value (SP - 5 - nArgs)
+    '@5',
+    'D=A',
+    '@ARG',
+    'M=M-D',
+
+    '@' + nArgs,
+    'D=A',
+    '@ARG',
+    'M=M-D',
+
+    // Set *LCL to equal *SP
+    '@SP',
+    'D=M',
+    '@LCL',
+    'M=D',
+
+    // jump to function
+    '@' + name,
+    '0;JMP',
+
+    // set marker for returning to
+    returnLabel.marker
+  ];
 }
 
 function return_() {
@@ -269,7 +334,7 @@ function translateLine(tokens) {
   } else if (tokens[0] === 'function') {
     return function_(tokens[1], tokens[2]);
   } else if (tokens[0] === 'call') {
-    return function_(tokens[1], tokens[2]);
+    return call(tokens[1], tokens[2]);
   } else if (tokens[0] === 'return') {
     return return_();
   } else if (tokens.length === 1) {
