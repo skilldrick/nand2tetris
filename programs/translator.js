@@ -255,7 +255,20 @@ function ifGoto(label) {
 }
 
 function function_(name, nVars) {
-  throw new Error("function not implemented yet");
+  // need to push nVars zeroes to the stack
+  var locals = [];
+  for (let i = 0; i < nVars; i++) {
+    locals = locals.concat([
+      "@0",
+      "D=A",
+      ...pushD
+    ]);
+  }
+
+  return [
+    "(" + name + ")",
+    ...locals,
+  ];
 }
 
 function call(name, nArgs) {
