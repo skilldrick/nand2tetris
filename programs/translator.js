@@ -4,16 +4,6 @@ var fs = require('fs');
 var path = require('path');
 var _ = require('lodash');
 
-const inputFilePath = process.argv[2];
-const outputFilePath = inputFilePath.replace(/\.\w+$/, '.asm');
-const className = path.basename(inputFilePath).replace(/\.\w+$/, '');
-const file = fs.readFileSync(inputFilePath, 'utf8');
-
-// remove comments and whitespace
-const lines = file.split("\n").map(line => {
-  return line.replace(/\/\/.*/, '').trim();
-}).filter(line => line.length);
-
 
 var labelIndex = 0;
 function generateNewLabel() {
@@ -27,7 +17,8 @@ function generateNewLabel() {
 }
 
 var returnLabelIndex = 0;
-function generateNewReturnLabel() {
+function generateNewReturnLabel(className) {
+  if (!className) throw new Error("Need to pass through className");
   const id = ++returnLabelIndex;
   const label = className + "$ret." + id;
 
@@ -37,7 +28,8 @@ function generateNewReturnLabel() {
   };
 }
 
-function staticAddress(value) {
+function staticAddress(value, className) {
+  if (!className) throw new Error("Need to pass through className");
   return '@' + className + '.' + value;
 }
 
@@ -119,7 +111,7 @@ const pushD = [
   'M=M+1'
 ];
 
-function push(type, value) {
+function push(type, value, className) {
   if (type === 'constant') {
     return [
       // set D to value
@@ -130,7 +122,7 @@ function push(type, value) {
   } else if (type === 'static') {
     return [
       // set D to *@File.value
-      staticAddress(value),
+      staticAddress(value, className),
       'D=M',
     ].concat(pushD);
 
@@ -176,11 +168,11 @@ const popD = [
   'D=M',
 ];
 
-function pop(type, value) {
+function pop(type, value, className) {
   if (type === 'static') {
     return popD.concat([
       // Store D in static address
-      staticAddress(value),
+      staticAddress(value, className),
 
       'M=D',
     ]);
@@ -271,8 +263,8 @@ function function_(name, nVars) {
   ];
 }
 
-function call(name, nArgs) {
-  const returnLabel = generateNewReturnLabel();
+function call(name, nArgs, className) {
+  const returnLabel = generateNewReturnLabel(className);
 
   function pushAddress(address) {
     return [
@@ -333,11 +325,11 @@ function return_() {
   throw new Error("return not implemented yet");
 }
 
-function translateLine(tokens) {
+function translateLine(tokens, className) {
   if (tokens[0] === 'push') {
-    return push(tokens[1], tokens[2]);
+    return push(tokens[1], tokens[2], className);
   } else if (tokens[0] === 'pop') {
-    return pop(tokens[1], tokens[2]);
+    return pop(tokens[1], tokens[2], className);
   } else if (tokens[0] === 'label') {
     return label(tokens[1]);
   } else if (tokens[0] === 'goto') {
@@ -347,7 +339,7 @@ function translateLine(tokens) {
   } else if (tokens[0] === 'function') {
     return function_(tokens[1], tokens[2]);
   } else if (tokens[0] === 'call') {
-    return call(tokens[1], tokens[2]);
+    return call(tokens[1], tokens[2], className);
   } else if (tokens[0] === 'return') {
     return return_();
   } else if (tokens.length === 1) {
@@ -357,21 +349,70 @@ function translateLine(tokens) {
   }
 }
 
-const processed = _.flatten(lines.map(line => {
-  const tokens = line.split(" ");
+function flatMap(arr, func) {
+  return _.flatten(arr.map(func));
+}
 
-  const outputForLine = [
-    "// " + line
+function main() {
+  const inputFilePath = process.argv[2];
+  const isDirectory = fs.lstatSync(inputFilePath).isDirectory();
+
+  let outputFilePath;
+  let vmFiles;
+  if (isDirectory) {
+    const filename = path.parse(inputFilePath).name + ".asm";
+    outputFilePath = path.join(inputFilePath, filename);
+    vmFiles = fs.readdirSync(inputFilePath).filter(file =>
+        file.match(/\.vm$/)
+      ).map(file =>
+        path.join(inputFilePath, file)
+      );
+  } else {
+    outputFilePath = inputFilePath.replace(/\.\w+$/, '.asm');
+    vmFiles = [inputFilePath];
+  }
+
+  const bootstrapCode = [
+    "@256",
+    "D=A",
+    "@SP",
+    "M=D",
+    "@Sys.init",
+    "0;JMP"
   ];
 
-  // always add commented line
-  return outputForLine.concat(translateLine(tokens));
-}));
+  const allFilesProcessed = flatMap(vmFiles, inputFile => {
+    const className = path.basename(inputFile).replace(/\.\w+$/, '');
+    const file = fs.readFileSync(inputFile, 'utf8');
 
-const output = processed.join("\n");
+    // remove comments and whitespace
+    const lines = file.split("\n").map(line => {
+      return line.replace(/\/\/.*/, '').trim();
+    }).filter(line => line.length);
 
-if (process.argv[3] == '--debug') {
-  console.log(output);
-} else {
-  fs.writeFileSync(outputFilePath, output);
+
+    const processed = flatMap(lines, line => {
+      const tokens = line.split(" ");
+
+      const outputForLine = [
+        "// " + line
+      ];
+
+      // always add commented line
+      return outputForLine.concat(translateLine(tokens, className));
+    });
+
+    return processed;
+  });
+
+
+  const output = bootstrapCode.concat(allFilesProcessed).join("\n");
+
+  if (process.argv[3] == '--debug') {
+    console.log(output);
+  } else {
+    fs.writeFileSync(outputFilePath, output);
+  }
 }
+
+main();
