@@ -221,13 +221,49 @@ function pop(type, value) {
   }
 }
 
+function label(label) {
+  throw new Error("label not implemented yet");
+}
+
+function goto(label) {
+  throw new Error("goto not implemented yet");
+}
+
+function ifGoto(label) {
+  throw new Error("if-goto not implemented yet");
+}
+
+function function_(name, nVars) {
+  throw new Error("function not implemented yet");
+}
+
+function call(name, nArgs) {
+  throw new Error("call not implemented yet");
+}
+
+function return_() {
+  throw new Error("return not implemented yet");
+}
+
 function translateLine(tokens) {
-  if (tokens.length === 1) {
-    return operations[tokens[0]]();
-  } else if (tokens[0] === 'push') {
+  if (tokens[0] === 'push') {
     return push(tokens[1], tokens[2]);
   } else if (tokens[0] === 'pop') {
     return pop(tokens[1], tokens[2]);
+  } else if (tokens[0] === 'label') {
+    return label(tokens[1]);
+  } else if (tokens[0] === 'goto') {
+    return goto(tokens[1]);
+  } else if (tokens[0] === 'if-goto') {
+    return ifGoto(tokens[1], tokens[2]);
+  } else if (tokens[0] === 'function') {
+    return function_(tokens[1], tokens[2]);
+  } else if (tokens[0] === 'call') {
+    return function_(tokens[1], tokens[2]);
+  } else if (tokens[0] === 'return') {
+    return return_();
+  } else if (tokens.length === 1) {
+    return operations[tokens[0]]();
   } else {
     throw new Error(tokens[0] + " not implemented yet");
   }
