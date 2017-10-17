@@ -170,15 +170,18 @@ const popD = [
 
 function pop(type, value, className) {
   if (type === 'static') {
-    return popD.concat([
+    return [
+      ...popD,
+
       // Store D in static address
       staticAddress(value, className),
 
       'M=D',
-    ]);
+    ];
 
   } else if (type === 'temp') {
-    return popD.concat([
+    return [
+      ...popD,
       // Store D in (value + 5)
       '@' + value,
       'A=A+1',
@@ -187,15 +190,17 @@ function pop(type, value, className) {
       'A=A+1',
       'A=A+1',
       'M=D'
-    ]);
+    ];
 
   } else if (type === 'pointer') {
     const POINTER = pointers[value];
-    return popD.concat([
+    return [
+      ...popD,
+
       // Store D in THIS or THAT (depending on value == 0 or value == 1)
       POINTER,
       'M=D',
-    ]);
+    ];
 
   } else if (segments[type]) {
     const SEGMENT = segments[type];
@@ -349,10 +354,6 @@ function translateLine(tokens, className) {
   }
 }
 
-function flatMap(arr, func) {
-  return _.flatten(arr.map(func));
-}
-
 function main() {
   const inputFilePath = process.argv[2];
   const isDirectory = fs.lstatSync(inputFilePath).isDirectory();
@@ -381,9 +382,15 @@ function main() {
     "0;JMP"
   ];
 
-  const allFilesProcessed = flatMap(vmFiles, inputFile => {
+  const allFilesProcessed = _.flatMap(vmFiles, inputFile => {
     const className = path.basename(inputFile).replace(/\.\w+$/, '');
     const file = fs.readFileSync(inputFile, 'utf8');
+
+    const fileHeader = [
+      "///////////",
+      "// " + className,
+      "///////////",
+    ];
 
     // remove comments and whitespace
     const lines = file.split("\n").map(line => {
@@ -391,7 +398,7 @@ function main() {
     }).filter(line => line.length);
 
 
-    const processed = flatMap(lines, line => {
+    const processed = _.flatMap(lines, line => {
       const tokens = line.split(" ");
 
       const outputForLine = [
@@ -399,14 +406,13 @@ function main() {
       ];
 
       // always add commented line
-      return outputForLine.concat(translateLine(tokens, className));
+      return _.concat(outputForLine, translateLine(tokens, className));
     });
 
-    return processed;
+    return _.concat(fileHeader, processed);
   });
 
-
-  const output = bootstrapCode.concat(allFilesProcessed).join("\n");
+  const output = _.concat(bootstrapCode, allFilesProcessed).join("\n");
 
   if (process.argv[3] == '--debug') {
     console.log(output);
