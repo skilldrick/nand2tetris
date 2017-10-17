@@ -157,7 +157,7 @@ function push(type, value, className) {
     ].concat(pushD);
 
   } else {
-    throw new Error(type + " not implemented yet");
+    throw new Error("Unknown segment " + type);
   }
 }
 
@@ -226,7 +226,7 @@ function pop(type, value, className) {
     ];
 
   } else {
-    throw new Error(type + " not implemented yet");
+    throw new Error("Unknown segment " + type);
   }
 }
 
@@ -327,7 +327,59 @@ function call(name, nArgs, className) {
 }
 
 function return_() {
-  throw new Error("return not implemented yet");
+  // See Unit 2.6 21:10
+  return [
+    // pop into *ARG
+    ...popD,
+    "@ARG",
+    "A=M",
+    "M=D",
+
+    // set SP to ARG + 1
+    "@ARG",
+    "D=M",
+    "@SP",
+    "M=D+1",
+
+    // store LCL in R13 (marks end of frame)
+    "@LCL",
+    "D=M",
+    "@R13",
+    "M=D",
+
+    // decrement R13 and save value as THAT
+    "@R13",
+    "AM=M-1",
+    "D=M",
+    "@THAT",
+    "M=D",
+
+    // decrement R13 and save value as THIS
+    "@R13",
+    "AM=M-1",
+    "D=M",
+    "@THIS",
+    "M=D",
+
+    // decrement R13 and save value as ARG
+    "@R13",
+    "AM=M-1",
+    "D=M",
+    "@ARG",
+    "M=D",
+
+    // decrement R13 and save value as LCL
+    "@R13",
+    "AM=M-1",
+    "D=M",
+    "@LCL",
+    "M=D",
+
+    // decrement R13 and jump to value
+    "@R13",
+    "AM=M-1",
+    "0;JMP"
+  ];
 }
 
 function translateLine(tokens, className) {
@@ -350,7 +402,7 @@ function translateLine(tokens, className) {
   } else if (tokens.length === 1) {
     return operations[tokens[0]]();
   } else {
-    throw new Error(tokens[0] + " not implemented yet");
+    throw new Error("Unknown token " + tokens[0]);
   }
 }
 
@@ -374,12 +426,12 @@ function main() {
   }
 
   const bootstrapCode = [
-    "@256",
-    "D=A",
-    "@SP",
-    "M=D",
-    "@Sys.init",
-    "0;JMP"
+    "//@256",
+    "//D=A",
+    "//@SP",
+    "//M=D",
+    "//@Sys.init",
+    "//0;JMP"
   ];
 
   const allFilesProcessed = _.flatMap(vmFiles, inputFile => {
