@@ -288,8 +288,6 @@ function call(name, nArgs, className) {
   }
 
   return [
-    // if nArgs is zero, push a dummy value
-    ...((nArgs === 0) ? pushAddress("@123") : []),
     ...pushAddress(returnLabel.address),
     ...pushValueAtAddress('@LCL'),
     ...pushValueAtAddress('@ARG'),
@@ -308,7 +306,7 @@ function call(name, nArgs, className) {
     '@ARG',
     'M=M-D',
 
-    '@' + Math.max(nArgs, 1), // if nArgs was zero we pushed a dummy value
+    '@' + nArgs,
     'D=A',
     '@ARG',
     'M=M-D',
@@ -331,6 +329,22 @@ function call(name, nArgs, className) {
 function return_() {
   // See Unit 2.6 21:10
   return [
+    // store LCL in R13 (marks end of frame)
+    "@LCL",
+    "D=M",
+    "@R13",
+    "M=D",
+
+    // store return address in R14 (*(R13 - 5))
+    "@5",
+    "D=A",
+    "@R13",
+    "A=M",
+    "A=A-D",
+    "D=M",
+    "@R14",
+    "M=D",
+
     // pop into *ARG
     ...popD,
     "@ARG",
@@ -342,12 +356,6 @@ function return_() {
     "D=M",
     "@SP",
     "M=D+1",
-
-    // store LCL in R13 (marks end of frame)
-    "@LCL",
-    "D=M",
-    "@R13",
-    "M=D",
 
     // decrement R13 and save value as THAT
     "@R13",
@@ -377,9 +385,8 @@ function return_() {
     "@LCL",
     "M=D",
 
-    // decrement R13 and jump to value
-    "@R13",
-    "AM=M-1",
+    // Jump to *R14
+    "@R14",
     "A=M",
     "0;JMP"
   ];
@@ -433,8 +440,8 @@ function main() {
     "//D=A",
     "//@SP",
     "//M=D",
-    "//@Sys.init",
-    "//0;JMP"
+    "@Sys.init",
+    "0;JMP"
   ];
 
   const allFilesProcessed = _.flatMap(vmFiles, inputFile => {
