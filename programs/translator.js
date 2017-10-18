@@ -288,6 +288,8 @@ function call(name, nArgs, className) {
   }
 
   return [
+    // if nArgs is zero, push a dummy value
+    ...((nArgs === 0) ? pushAddress("@123") : []),
     ...pushAddress(returnLabel.address),
     ...pushValueAtAddress('@LCL'),
     ...pushValueAtAddress('@ARG'),
@@ -306,7 +308,7 @@ function call(name, nArgs, className) {
     '@ARG',
     'M=M-D',
 
-    '@' + nArgs,
+    '@' + Math.max(nArgs, 1), // if nArgs was zero we pushed a dummy value
     'D=A',
     '@ARG',
     'M=M-D',
@@ -378,6 +380,7 @@ function return_() {
     // decrement R13 and jump to value
     "@R13",
     "AM=M-1",
+    "A=M",
     "0;JMP"
   ];
 }
@@ -394,9 +397,9 @@ function translateLine(tokens, className) {
   } else if (tokens[0] === 'if-goto') {
     return ifGoto(tokens[1], tokens[2]);
   } else if (tokens[0] === 'function') {
-    return function_(tokens[1], tokens[2]);
+    return function_(tokens[1], +tokens[2]);
   } else if (tokens[0] === 'call') {
-    return call(tokens[1], tokens[2], className);
+    return call(tokens[1], +tokens[2], className);
   } else if (tokens[0] === 'return') {
     return return_();
   } else if (tokens.length === 1) {
