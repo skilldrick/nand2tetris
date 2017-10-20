@@ -1,0 +1,42 @@
+class Main {
+  function void main() {
+    var Snake snake;
+    let snake = Snake.new();
+
+    do Main.drawWall();
+
+    while (~snake.getGameOver()) {
+      do snake.clear();
+      do snake.update();
+      do snake.draw();
+      do Sys.wait(200);
+    }
+
+    return;
+  }
+
+  function void drawWall() {
+    var int i;
+    var int screenI;
+
+    let i = 0;
+
+    do Screen.setColor(true);
+    while (i < 32) {
+      let screenI = i * 16;
+      do Screen.drawRectangle(screenI, 0, screenI + 15, 15);
+      do Screen.drawRectangle(screenI, 256 - 16, screenI + 15, 255);
+      let i = i + 1;
+    }
+
+    let i = 0;
+    while (i < 16) {
+      let screenI = i * 16;
+      do Screen.drawRectangle(0, screenI, 15, screenI + 15);
+      do Screen.drawRectangle(512 - 16, screenI, 511, screenI + 15);
+      let i = i + 1;
+    }
+
+    return;
+  }
+}
