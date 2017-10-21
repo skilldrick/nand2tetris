@@ -10,7 +10,7 @@
   "bin": {
     "hackassemble": "assembler.js",
     "hacktranslate": "translator.js",
-    "hackparse": "parser.js"
+    "hackparse": "analyzer.js"
   },
   "dependencies": {
     "lodash": "^4.17.4"
