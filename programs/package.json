@@ -9,7 +9,8 @@
   "license": "ISC",
   "bin": {
     "hackassemble": "assembler.js",
-    "hacktranslate": "translator.js"
+    "hacktranslate": "translator.js",
+    "hackparse": "parser.js"
   },
   "dependencies": {
     "lodash": "^4.17.4"
