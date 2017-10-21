@@ -1,7 +1,7 @@
 function tokenize(file) {
   let i = 0;
 
-  const OPERATORS = [
+  const SYMBOLS = [
     '(', ')', '{', '}', '[', ']', '.', ',', ';', '+',
     '-', '*', '/', '&', '|', '<', '>', '=', '~'
   ];
@@ -64,8 +64,8 @@ function tokenize(file) {
     return { type: "integer", value: int };
   }
 
-  function tokenizeOperator() {
-    return { type: "operator", value: consumeChar() };
+  function tokenizeSymbol() {
+    return { type: "symbol", value: consumeChar() };
   }
 
   function tokenizeString() {
@@ -85,9 +85,13 @@ function tokenize(file) {
   }
 
   function skipBlockComment() {
-    while (getChar() !== '*' && peekChar() !== '/') {
+    advance(2);
+
+    while (!(getChar() === '*' && peekChar() === '/')) {
       advance();
     }
+
+    advance(2);
   }
 
 
@@ -106,8 +110,8 @@ function tokenize(file) {
       skipLineComment();
     } else if (getChar() === '/' && peekChar() === '*') {
       skipBlockComment();
-    } else if (OPERATORS.indexOf(getChar()) !== -1) {
-      tokens.push(tokenizeOperator());
+    } else if (SYMBOLS.indexOf(getChar()) !== -1) {
+      tokens.push(tokenizeSymbol());
     } else if (getChar() === '"') {
       tokens.push(tokenizeString());
     } else {

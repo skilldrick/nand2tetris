@@ -22,7 +22,7 @@ function convertToXml(arr, indent = 0) {
     if (el.content !== undefined) {
       return [
         space(indent) + openingTag(el.type),
-        convertToXml(el.content, indent + 2),
+        ...convertToXml(el.content, indent + 2),
         space(indent) + closingTag(el.type)
       ];
     } else {
@@ -56,10 +56,14 @@ function main() {
   }
 
   const debugOutput = jackFiles.map(filePath => {
-    const outputFilePath = filePath.replace(/\.\w+$/, '.xml');
+    const outputFilePath = filePath.replace(/\.\w+$/, '-mine.xml');
     const file = fs.readFileSync(filePath, 'utf8');
 
-    const output = convertToXml(processFile(file)).join("\n");
+    const processed = [
+      { type: "tokens", content: processFile(file) }
+    ];
+
+    const output = convertToXml(processed).join("\n");
 
     if (debug) {
       console.log(output);
