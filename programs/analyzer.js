@@ -56,9 +56,7 @@ function main() {
 
     const tokens = tokenize(file);
 
-    const processed = [
-      { type: "class", content: parse(tokens) }
-    ];
+    const processed = parse(tokens);
 
     const output = convertToXml(processed).join("\n");
 

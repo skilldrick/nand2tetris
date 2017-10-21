@@ -47,7 +47,7 @@ function tokenize(file) {
       ident += consumeChar();
     }
 
-    if (KEYWORDS.indexOf(ident) !== -1) {
+    if (KEYWORDS.includes(ident)) {
       return { type: "keyword", value: ident };
     } else {
       return { type: "identifier", value: ident };
@@ -110,7 +110,7 @@ function tokenize(file) {
       skipLineComment();
     } else if (getChar() === '/' && peekChar() === '*') {
       skipBlockComment();
-    } else if (SYMBOLS.indexOf(getChar()) !== -1) {
+    } else if (SYMBOLS.includes(getChar())) {
       tokens.push(tokenizeSymbol());
     } else if (getChar() === '"') {
       tokens.push(tokenizeString());
