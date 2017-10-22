@@ -4,6 +4,9 @@ var _ = require('lodash');
 function parse(tokens) {
   let i = 0;
 
+  const unaryOperators = ['-', '~'];
+  const binaryOperators = ['+', '-', '*', '/', '&', '|', '<', '>', '='];
+
   function moreTokens() {
     return i < tokens.length;
   }
@@ -14,6 +17,10 @@ function parse(tokens) {
 
   function peekToken() {
     return tokens[i + 1];
+  }
+
+  function nextTypeIs(type) {
+    return getToken().type === type;
   }
 
   function nextValueIs(value) {
@@ -201,24 +208,76 @@ function parse(tokens) {
     ]
   }
 
+  function consumeUnaryTerm() {
+    return [
+      consumeSymbol(unaryOperators),
+      consumeTerm()
+    ];
+  }
+
+  function consumeArrayAccess() {
+    return [
+      consumeIdentifier(),
+      ...consumeOptionalArraySubscript()
+    ];
+  }
+
+  function consumeMethodCall() {
+    return [
+      consumeIdentifier(),
+      ...consumeOptionalMethodDereference()
+    ];
+  }
+
+  function consumeParenthesizedExpression() {
+    return [
+      consumeSymbol('('),
+      consumeExpression(),
+      consumeSymbol(')')
+    ];
+  }
+
   function consumeTerm() {
+    function consumeTermContent() {
+      if (nextValueIsOneOf(unaryOperators)) {
+        return consumeUnaryTerm();
+      } else if (nextTypeIs('integerConstant')) {
+        return [consume('integerConstant', null)];
+      } else if (nextTypeIs('stringConstant')) {
+        return [consume('stringConstant', null)];
+      } else if (nextValueIsOneOf(['true', 'false', 'null', 'this'])) {
+        return [consumeKeyword(null)];
+      } else if (nextValueIs('(')) {
+        return consumeParenthesizedExpression();
+      } else if (nextTypeIs('identifier') || nextValueIs('this')) {
+        if (peekToken().value === '[') {
+          return consumeArrayAccess();
+        } else if (peekToken().value === '.' || peekToken().value === '(') {
+          return consumeSubroutineCall();
+        } else {
+          return [consumeIdentifier()];
+        }
+      } else {
+        throw new Error('Unknown term');
+      }
+    }
+
     return {
       type: 'term',
-      content: [
-        // TODO: include other expressions
-        consumeIdentifier()
-      ]
+      content: consumeTermContent()
     };
+  }
+
+  function consumeOperator() {
+    return consumeSymbol(binaryOperators);
   }
 
   function consumeExpression() {
     function consumeOptionalOperatorAndTerm() {
-      const binaryOperators = ['+', '-', '*', '/', '&', '|', '<', '>', '='];
-
       if (nextValueIsOneOf(binaryOperators)) {
         return [
-          consumeSymbol(binaryOperators),
-          consumeTerm()
+          consumeOperator(),
+          consumeExpression()
         ];
       } else {
         return [];

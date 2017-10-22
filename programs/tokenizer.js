@@ -61,7 +61,7 @@ function tokenize(file) {
       int += consumeChar();
     }
 
-    return { type: "integer", value: int };
+    return { type: "integerConstant", value: int };
   }
 
   function tokenizeSymbol() {
@@ -71,11 +71,15 @@ function tokenize(file) {
   function tokenizeString() {
     let str = "";
 
+    advance(); // skip opening quote
+
     while (getChar() !== '"') {
       str += consumeChar();
     }
 
-    return { type: "string", value: str };
+    advance(); // skip closing quote
+
+    return { type: "stringConstant", value: str };
   }
 
   function skipLineComment() {
