@@ -16,6 +16,14 @@ function parse(tokens) {
     return tokens[i + 1];
   }
 
+  function nextValueIs(value) {
+    return getToken().value === value;
+  }
+
+  function nextValueIsOneOf(values) {
+    return values.includes(getToken().value);
+  }
+
   function consumeAlternatives(specs) {
     const token = tokens[i++];
 
@@ -28,6 +36,7 @@ function parse(tokens) {
     const matches = specs.some(matchesAlternative);
 
     if (!matches) {
+      console.log("Context:\n", tokens.slice(i - 3, i + 2));
       throw new Error(
         "Expected " + JSON.stringify(token) + " to match: " + JSON.stringify(specs)
       );
@@ -51,7 +60,11 @@ function parse(tokens) {
   }
 
   function consumeIdentifier() {
-    return consume('identifier', null);
+    return consumeAlternatives([
+      { type: 'identifier', value: null },
+      // identifier can be 'this' in many circumstances
+      { type: 'keyword', value: 'this' },
+    ]);
   }
 
   function consumeSymbol(expected) {
@@ -65,113 +78,6 @@ function parse(tokens) {
       { type: 'keyword', value: 'boolean' },
       { type: 'identifier', value: null }
     ]);
-  }
-
-  // (, func())*
-  function consumeZeroOrMoreListItems(func) {
-    return zeroOrMoreTimes(() => {
-      if (getToken().value === ',') {
-        return [
-          consumeSymbol(','),
-          ...func()
-        ];
-      } else {
-        return null;
-      }
-    });
-  }
-
-  function consumeVarDec(type, varTypes) {
-    const nextTokenValue = getToken().value;
-    if (varTypes.includes(nextTokenValue)) {
-      return {
-        type: type,
-        content: [
-          consumeKeyword(varTypes),
-          consumeType(),
-          consumeIdentifier(),
-          ...consumeZeroOrMoreListItems(() => {
-            return [
-              consumeIdentifier()
-            ];
-          }),
-          consumeSymbol(';')
-        ]
-      };
-    } else {
-      return null;
-    }
-  }
-
-  function consumeClassVarDec() {
-    return consumeVarDec('classVarDec', ['static', 'field']);
-  }
-
-  function consumeSubroutineVarDec() {
-    return consumeVarDec('varDec', ['var']);
-  }
-
-  function consumeParameterList() {
-    // empty parameter list
-    if (getToken().value === ')') {
-      return [];
-    } else {
-      return [
-        {
-          type: 'parameterList',
-          content: [
-            consumeType(),
-            consumeIdentifier(),
-            ...consumeZeroOrMoreListItems(() => {
-              return [
-                consumeType(),
-                consumeIdentifier()
-              ];
-            })
-          ]
-        }
-      ];
-    }
-  }
-
-  function consumeStatement() {
-    return null;
-  }
-
-  function consumeSubroutineBody() {
-    return {
-      type: 'subroutineBody',
-      content: [
-        consumeSymbol('{'),
-        ...zeroOrMoreTimes(consumeSubroutineVarDec),
-        ...zeroOrMoreTimes(consumeStatement),
-        consumeSymbol('}'),
-      ]
-    };
-  }
-
-  function consumeSubroutineDec() {
-    const nextTokenValue = getToken().value;
-    const subroutineTypes = ['constructor', 'function', 'method'];
-    if (subroutineTypes.includes(nextTokenValue)) {
-      return {
-        type: 'subroutineDec',
-        content: [
-          consumeKeyword(subroutineTypes),
-          consumeAlternatives([
-            { type: 'keyword', value: 'void' },
-            { type: 'identifier', value: null }
-          ]),
-          consumeIdentifier(),
-          consumeSymbol('('),
-          ...consumeParameterList(),
-          consumeSymbol(')'),
-          consumeSubroutineBody()
-        ]
-      };
-    } else {
-      return null;
-    }
   }
 
   function zeroOrMoreTimes(func) {
@@ -194,19 +100,328 @@ function parse(tokens) {
     }
   }
 
-  function parseClass() {
-    return [
-      consumeKeyword('class'),
-      consumeIdentifier(),
-      consumeSymbol('{'),
-      ...zeroOrMoreTimes(consumeClassVarDec),
-      ...zeroOrMoreTimes(consumeSubroutineDec),
-    ];
+  // (, func())*
+  function consumeZeroOrMoreListItems(func) {
+    return zeroOrMoreTimes(() => {
+      if (nextValueIs(',')) {
+        return [
+          consumeSymbol(','),
+          ...func()
+        ];
+      } else {
+        return null;
+      }
+    });
   }
 
-  let parseTree = [
-    { type: 'class', content: parseClass() }
-  ];
+  function consumeVarDec(type, varTypes) {
+    if (nextValueIsOneOf(varTypes)) {
+      return {
+        type: type,
+        content: [
+          consumeKeyword(varTypes),
+          consumeType(),
+          consumeIdentifier(),
+          ...consumeZeroOrMoreListItems(() =>
+            [
+              consumeIdentifier()
+            ]
+          ),
+          consumeSymbol(';')
+        ]
+      };
+    } else {
+      return null;
+    }
+  }
+
+  function consumeClassVarDec() {
+    return consumeVarDec('classVarDec', ['static', 'field']);
+  }
+
+  function consumeSubroutineVarDec() {
+    return consumeVarDec('varDec', ['var']);
+  }
+
+  function consumeParameterList() {
+    function consumeParameterListContent() {
+      // empty parameter list
+      if (nextValueIs(')')) {
+        return [];
+      } else {
+        return [
+          consumeType(),
+          consumeIdentifier(),
+          ...consumeZeroOrMoreListItems(() =>
+            [
+              consumeType(),
+              consumeIdentifier()
+            ]
+          )
+        ];
+      }
+    }
+
+    return {
+      type: 'parameterList',
+      content: consumeParameterListContent()
+    }
+  }
+
+  function consumeOptionalArraySubscript() {
+    if (nextValueIs('[')) {
+      return [
+        consumeSymbol('['),
+        consumeExpression(),
+        consumeSymbol(']')
+      ];
+    } else {
+      return [];
+    }
+  }
+
+  function consumeSubroutineCall() {
+    function consumeOptionalMethodDereference() {
+      if (nextValueIs('.')) {
+        return [
+          consumeSymbol('.'),
+          consumeIdentifier()
+        ];
+      } else {
+        return [];
+      }
+    }
+
+    return [
+      consumeIdentifier(),
+      ...consumeOptionalMethodDereference(),
+      consumeSymbol('('),
+      consumeExpressionList(),
+      consumeSymbol(')')
+    ]
+  }
+
+  function consumeTerm() {
+    return {
+      type: 'term',
+      content: [
+        // TODO: include other expressions
+        consumeIdentifier()
+      ]
+    };
+  }
+
+  function consumeExpression() {
+    function consumeOptionalOperatorAndTerm() {
+      const binaryOperators = ['+', '-', '*', '/', '&', '|', '<', '>', '='];
+
+      if (nextValueIsOneOf(binaryOperators)) {
+        return [
+          consumeSymbol(binaryOperators),
+          consumeTerm()
+        ];
+      } else {
+        return [];
+      }
+    }
+
+    return {
+      type: 'expression',
+      content: [
+        consumeTerm(),
+        ...consumeOptionalOperatorAndTerm()
+      ]
+    };
+  }
+
+  function consumeExpressionList() {
+    function consumeExpressionListContent() {
+      if (nextValueIs(')')) {
+        return []
+      } else {
+        return [
+          consumeExpression(),
+          ...consumeZeroOrMoreListItems(() => [ consumeExpression() ])
+        ]
+      }
+    }
+
+    return {
+      type: 'expressionList',
+      content: consumeExpressionListContent()
+    };
+  }
+
+  function consumeLetStatement() {
+    return {
+      type: 'letStatement',
+      content: [
+        consumeKeyword('let'),
+        consumeIdentifier(),
+        ...consumeOptionalArraySubscript(),
+        consumeSymbol('='),
+        consumeExpression(),
+        consumeSymbol(';')
+      ]
+    };
+  }
+
+  function consumeIfStatement() {
+    function consumeOptionalElseClause() {
+      if (nextValueIs('else')) {
+        return [
+          consumeKeyword('else'),
+          consumeSymbol('{'),
+          consumeStatements(),
+          consumeSymbol('}')
+        ];
+      } else {
+        return [];
+      }
+    }
+
+    return {
+      type: 'ifStatement',
+      content: [
+        consumeKeyword('if'),
+        consumeSymbol('('),
+        consumeExpression(),
+        consumeSymbol(')'),
+        consumeSymbol('{'),
+        consumeStatements(),
+        consumeSymbol('}'),
+        ...consumeOptionalElseClause()
+      ]
+    };
+  }
+
+  function consumeWhileStatement() {
+    return {
+      type: 'whileStatement',
+      content: [
+        consumeKeyword('while'),
+        consumeSymbol('('),
+        consumeExpression(),
+        consumeSymbol(')'),
+        consumeSymbol('{'),
+        consumeStatements(),
+        consumeSymbol('}'),
+      ]
+    };
+  }
+
+  function consumeDoStatement() {
+    return {
+      type: 'doStatement',
+      content: [
+        consumeKeyword('do'),
+        ...consumeSubroutineCall(),
+        consumeSymbol(';')
+      ]
+    };
+  }
+
+  function consumeReturnStatement() {
+    function consumeOptionalReturnExpression() {
+      if (nextValueIs(';')) {
+        return [];
+      } else {
+        return [
+          consumeExpression(),
+        ];
+      }
+    }
+
+    return {
+      type: 'returnStatement',
+      content: [
+        consumeKeyword('return'),
+        ...consumeOptionalReturnExpression(),
+        consumeSymbol(';')
+      ]
+    };
+  }
+
+  function consumeStatement() {
+    const statementTypes = {
+      'let': consumeLetStatement,
+      'if': consumeIfStatement,
+      'while': consumeWhileStatement,
+      'do': consumeDoStatement,
+      'return': consumeReturnStatement
+    };
+
+    const consumeNextStatement = statementTypes[getToken().value];
+
+    if (consumeNextStatement) {
+      return consumeNextStatement();
+    } else {
+      return null;
+    }
+  }
+
+  function consumeStatements() {
+    return {
+      type: 'statements',
+      content: zeroOrMoreTimes(consumeStatement)
+    }
+  }
+
+  function consumeSubroutineBody() {
+    return {
+      type: 'subroutineBody',
+      content: [
+        consumeSymbol('{'),
+        ...zeroOrMoreTimes(consumeSubroutineVarDec),
+        consumeStatements(),
+        consumeSymbol('}')
+      ]
+    };
+  }
+
+  function consumeSubroutineDec() {
+    const subroutineTypes = ['constructor', 'function', 'method'];
+
+    function consumeSubroutineReturnType() {
+      return consumeAlternatives([
+        { type: 'keyword', value: 'void' },
+        { type: 'identifier', value: null }
+      ]);
+    }
+
+    if (nextValueIsOneOf(subroutineTypes)) {
+      return {
+        type: 'subroutineDec',
+        content: [
+          consumeKeyword(subroutineTypes),
+          consumeSubroutineReturnType(),
+          consumeIdentifier(),
+          consumeSymbol('('),
+          consumeParameterList(),
+          consumeSymbol(')'),
+          consumeSubroutineBody()
+        ]
+      };
+    } else {
+      return null;
+    }
+  }
+
+  function consumeClass() {
+    return {
+      type: 'class',
+      content: [
+        consumeKeyword('class'),
+        consumeIdentifier(),
+        consumeSymbol('{'),
+        ...zeroOrMoreTimes(consumeClassVarDec),
+        ...zeroOrMoreTimes(consumeSubroutineDec),
+        consumeSymbol('}'),
+      ]
+    };
+  }
+
+  let parseTree = [consumeClass()];
 
   return parseTree;
 }
