@@ -59,34 +59,114 @@ function parse(tokens) {
   }
 
   function consumeType() {
-    return consume(keyword, ['int', 'char', 'boolean'])
+    return consumeAlternatives([
+      { type: 'keyword', value: 'int' },
+      { type: 'keyword', value: 'char' },
+      { type: 'keyword', value: 'boolean' },
+      { type: 'identifier', value: null }
+    ]);
+  }
+
+  // (, func())*
+  function consumeZeroOrMoreListItems(func) {
+    return zeroOrMoreTimes(() => {
+      if (getToken().value === ',') {
+        return [
+          consumeSymbol(','),
+          ...func()
+        ];
+      } else {
+        return null;
+      }
+    });
+  }
+
+  function consumeVarDec(type, varTypes) {
+    const nextTokenValue = getToken().value;
+    if (varTypes.includes(nextTokenValue)) {
+      return {
+        type: type,
+        content: [
+          consumeKeyword(varTypes),
+          consumeType(),
+          consumeIdentifier(),
+          ...consumeZeroOrMoreListItems(() => {
+            return [
+              consumeIdentifier()
+            ];
+          }),
+          consumeSymbol(';')
+        ]
+      };
+    } else {
+      return null;
+    }
   }
 
   function consumeClassVarDec() {
+    return consumeVarDec('classVarDec', ['static', 'field']);
+  }
+
+  function consumeSubroutineVarDec() {
+    return consumeVarDec('varDec', ['var']);
+  }
+
+  function consumeParameterList() {
+    // empty parameter list
+    if (getToken().value === ')') {
+      return [];
+    } else {
+      return [
+        {
+          type: 'parameterList',
+          content: [
+            consumeType(),
+            consumeIdentifier(),
+            ...consumeZeroOrMoreListItems(() => {
+              return [
+                consumeType(),
+                consumeIdentifier()
+              ];
+            })
+          ]
+        }
+      ];
+    }
+  }
+
+  function consumeStatement() {
+    return null;
+  }
+
+  function consumeSubroutineBody() {
+    return {
+      type: 'subroutineBody',
+      content: [
+        consumeSymbol('{'),
+        ...zeroOrMoreTimes(consumeSubroutineVarDec),
+        ...zeroOrMoreTimes(consumeStatement),
+        consumeSymbol('}'),
+      ]
+    };
+  }
+
+  function consumeSubroutineDec() {
     const nextTokenValue = getToken().value;
-    if (nextTokenValue === 'static' || nextTokenValue === 'field') {
+    const subroutineTypes = ['constructor', 'function', 'method'];
+    if (subroutineTypes.includes(nextTokenValue)) {
       return {
-        type: 'classVarDec',
+        type: 'subroutineDec',
         content: [
-          consumeKeyword(['static', 'field']),
+          consumeKeyword(subroutineTypes),
           consumeAlternatives([
-            { type: 'keyword', value: 'int' },
-            { type: 'keyword', value: 'char' },
-            { type: 'keyword', value: 'boolean' },
+            { type: 'keyword', value: 'void' },
             { type: 'identifier', value: null }
           ]),
           consumeIdentifier(),
-          ...zeroOrMoreTimes(() => {
-            if (getToken().value === ',') {
-              return [
-                consumeSymbol(','),
-                consumeIdentifier()
-              ];
-            } else {
-              return null;
-            }
-          }),
-          consumeSymbol(';')
+          consumeSymbol('('),
+          ...consumeParameterList(),
+          consumeSymbol(')'),
+          consumeSubroutineBody()
         ]
       };
     } else {
@@ -98,6 +178,7 @@ function parse(tokens) {
     let output = [];
 
     // As long as func returns a result, add it to the output
+    // Once func returns null, return the array of output
     while(true) {
       let nextResult = func();
 
@@ -119,6 +200,7 @@ function parse(tokens) {
       consumeIdentifier(),
       consumeSymbol('{'),
       ...zeroOrMoreTimes(consumeClassVarDec),
+      ...zeroOrMoreTimes(consumeSubroutineDec),
     ];
   }
 
