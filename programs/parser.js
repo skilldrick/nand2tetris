@@ -277,7 +277,7 @@ function parse(tokens) {
       if (nextValueIsOneOf(binaryOperators)) {
         return [
           consumeOperator(),
-          consumeExpression()
+          consumeTerm()
         ];
       } else {
         return [];
