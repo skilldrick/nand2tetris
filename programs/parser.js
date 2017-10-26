@@ -1,11 +1,20 @@
-var _ = require('lodash');
+const symbolTable = require('./symbolTable.js');
+const _ = require('lodash');
 
 
 function parse(tokens) {
-  let i = 0;
-
   const unaryOperators = ['-', '~'];
   const binaryOperators = ['+', '-', '*', '/', '&', '|', '<', '>', '='];
+  const returnTypes = ['void', 'int', 'char', 'boolean'];
+
+  let i = 0;
+
+  let currentClassSymbolTable, currentSubroutineSymbolTable;
+  let mostRecentTypeDefinition; // super hacky but (shrug)
+
+  function getSymbol(name) {
+    return currentSubroutineSymbolTable.get(name) || currentClassSymbolTable.get(name);
+  }
 
   function moreTokens() {
     return i < tokens.length;
@@ -36,7 +45,11 @@ function parse(tokens) {
 
     function matchesAlternative(spec) {
       const typeMatches = !spec.type || spec.type === token.type;
-      const valueMatches = !spec.value || spec.value === token.value;
+
+      const valueMatches = !spec.value ||
+        spec.value === token.value ||
+        (Array.isArray(spec.value) && spec.value.includes(token.value));
+
       return typeMatches && valueMatches;
     }
 
@@ -53,25 +66,40 @@ function parse(tokens) {
   }
 
   function consume(type, value) {
-    if (Array.isArray(value)) {
-      return consumeAlternatives(
-        value.map(v => ({ type: type, value: v }))
-      );
-    } else {
-      return consumeAlternatives([{ type: type, value: value}]);
-    }
+    return consumeAlternatives([{ type: type, value: value}]);
   }
 
   function consumeKeyword(expected) {
     return consume('keyword', expected);
   }
 
-  function consumeIdentifier() {
-    return consumeAlternatives([
-      { type: 'identifier', value: null },
-      // identifier can be 'this' in many circumstances
-      { type: 'keyword', value: 'this' },
-    ]);
+  function consumeIdentifier(category, isDefinition) {
+    const token = consume('identifier', null);
+
+    if (isDefinition) {
+      if (category === 'class') {
+        currentClassSymbolTable = symbolTable(token.value);
+      } else if (category === 'subroutine') {
+        currentSubroutineSymbolTable = symbolTable(token.value);
+      } else if (category === 'static' || category === 'field') {
+        currentClassSymbolTable.add(token.value, mostRecentTypeDefinition, category);
+      } else {
+        currentSubroutineSymbolTable.add(token.value, mostRecentTypeDefinition, category);
+      }
+    } else {
+      let symbol = getSymbol(token.value);
+      console.log('symbol:', symbol);
+    }
+
+    return token;
+  }
+
+  function consumeIdentifierOrThis(category) {
+    if (nextTypeIs('keyword')) {
+      return consumeKeyword('this');
+    } else {
+      return consumeIdentifier(category, false);
+    }
   }
 
   function consumeSymbol(expected) {
@@ -79,12 +107,14 @@ function parse(tokens) {
   }
 
   function consumeType() {
-    return consumeAlternatives([
-      { type: 'keyword', value: 'int' },
-      { type: 'keyword', value: 'char' },
-      { type: 'keyword', value: 'boolean' },
+    const type = consumeAlternatives([
+      { type: 'keyword', value: returnTypes },
       { type: 'identifier', value: null }
     ]);
+
+    mostRecentTypeDefinition = type.value;
+
+    return type;
   }
 
   function zeroOrMoreTimes(func) {
@@ -123,15 +153,17 @@ function parse(tokens) {
 
   function consumeVarDec(type, varTypes) {
     if (nextValueIsOneOf(varTypes)) {
+      let varType = getToken().value;
+
       return {
         type: type,
         content: [
           consumeKeyword(varTypes),
           consumeType(),
-          consumeIdentifier(),
+          consumeIdentifier(varType, true),
           ...consumeZeroOrMoreListItems(() =>
             [
-              consumeIdentifier()
+              consumeIdentifier(varType, true)
             ]
           ),
           consumeSymbol(';')
@@ -158,11 +190,11 @@ function parse(tokens) {
       } else {
         return [
           consumeType(),
-          consumeIdentifier(),
+          consumeIdentifier('argument', true),
           ...consumeZeroOrMoreListItems(() =>
             [
               consumeType(),
-              consumeIdentifier()
+              consumeIdentifier('argument', true)
             ]
           )
         ];
@@ -192,7 +224,7 @@ function parse(tokens) {
       if (nextValueIs('.')) {
         return [
           consumeSymbol('.'),
-          consumeIdentifier()
+          consumeIdentifier('subroutine', false)
         ];
       } else {
         return [];
@@ -200,7 +232,7 @@ function parse(tokens) {
     }
 
     return [
-      consumeIdentifier(),
+      consumeIdentifier(null, false),
       ...consumeOptionalMethodDereference(),
       consumeSymbol('('),
       consumeExpressionList(),
@@ -217,14 +249,14 @@ function parse(tokens) {
 
   function consumeArrayAccess() {
     return [
-      consumeIdentifier(),
+      consumeIdentifier(null, false),
       ...consumeOptionalArraySubscript()
     ];
   }
 
   function consumeMethodCall() {
     return [
-      consumeIdentifier(),
+      consumeIdentifier(null, false),
       ...consumeOptionalMethodDereference()
     ];
   }
@@ -255,7 +287,7 @@ function parse(tokens) {
         } else if (peekToken().value === '.' || peekToken().value === '(') {
           return consumeSubroutineCall();
         } else {
-          return [consumeIdentifier()];
+          return [consumeIdentifierOrThis(null)];
         }
       } else {
         throw new Error('Unknown term');
@@ -316,7 +348,7 @@ function parse(tokens) {
       type: 'letStatement',
       content: [
         consumeKeyword('let'),
-        consumeIdentifier(),
+        consumeIdentifier('var', false),
         ...consumeOptionalArraySubscript(),
         consumeSymbol('='),
         consumeExpression(),
@@ -443,7 +475,7 @@ function parse(tokens) {
 
     function consumeSubroutineReturnType() {
       return consumeAlternatives([
-        { type: 'keyword', value: 'void' },
+        { type: 'keyword', value: returnTypes },
         { type: 'identifier', value: null }
       ]);
     }
@@ -454,7 +486,7 @@ function parse(tokens) {
         content: [
           consumeKeyword(subroutineTypes),
           consumeSubroutineReturnType(),
-          consumeIdentifier(),
+          consumeIdentifier('subroutine', true),
           consumeSymbol('('),
           consumeParameterList(),
           consumeSymbol(')'),
@@ -471,7 +503,7 @@ function parse(tokens) {
       type: 'class',
       content: [
         consumeKeyword('class'),
-        consumeIdentifier(),
+        consumeIdentifier('class', true),
         consumeSymbol('{'),
         ...zeroOrMoreTimes(consumeClassVarDec),
         ...zeroOrMoreTimes(consumeSubroutineDec),

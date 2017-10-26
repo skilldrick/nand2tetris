@@ -19,6 +19,20 @@ function space(indent) {
 }
 
 function convertToXml(arr, indent = 0) {
+  const escapees = {
+    '<': '&lt;',
+    '>': '&gt;',
+    '&': '&amp;'
+  };
+
+  function encode(value) {
+    if (escapees.hasOwnProperty(value)) {
+      return escapees[value];
+    } else {
+      return value;
+    }
+  }
+
   return _.flatMap(arr, el => {
     if (el.content !== undefined) {
       return [
@@ -28,7 +42,7 @@ function convertToXml(arr, indent = 0) {
       ];
     } else {
       return [
-        space(indent) + openingTag(el.type) + " " + el.value + " " + closingTag(el.type)
+        space(indent) + openingTag(el.type) + " " + encode(el.value) + " " + closingTag(el.type)
       ];
     }
   });
