@@ -17,7 +17,6 @@ function symbolTable(name) {
       }
       const index = indexes[kind]++;
       table[name] = { name, type, kind, index };
-      console.log(name, type, kind, index);
     },
     get: (name) => {
       if (table.hasOwnProperty(name)) {

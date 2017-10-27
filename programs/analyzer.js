@@ -2,6 +2,7 @@
 
 var tokenize = require('./tokenizer.js');
 var parse = require('./parser.js');
+var vmWriter = require('./vmWriter.js');
 var fs = require('fs');
 var _ = require('lodash');
 var path = require('path');
@@ -70,9 +71,12 @@ function main() {
 
     const tokens = tokenize(file);
 
-    const processed = parse(tokens);
+    const parseTree = parse(tokens);
 
-    const output = convertToXml(processed).join("\n");
+    const writerOutput = vmWriter(parseTree);
+
+    const output = writerOutput.join("\n");
+    //const output = convertToXml(processed).join("\n");
 
     if (debug) {
       console.log(output);

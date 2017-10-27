@@ -88,7 +88,7 @@ function parse(tokens) {
       }
     } else {
       let symbol = getSymbol(token.value);
-      console.log('symbol:', symbol);
+      Object.assign(token, symbol);
     }
 
     return token;
