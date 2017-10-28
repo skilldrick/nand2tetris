@@ -66,7 +66,7 @@ function main() {
   }
 
   const debugOutput = jackFiles.map(filePath => {
-    const outputFilePath = filePath.replace(/\.\w+$/, '-mine.xml');
+    const outputFilePath = filePath.replace(/\.\w+$/, '.vm');
     const file = fs.readFileSync(filePath, 'utf8');
 
     const tokens = tokenize(file);
