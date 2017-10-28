@@ -47,6 +47,16 @@ function vmWriter(parseTree: {}, className: string): string[] {
 
   const booleans = ['true', 'false'];
 
+  function toString(tokens: {}[]): string {
+    return tokens.map(token => {
+      if (token.value) {
+        return token.value;
+      } else {
+        return toString(token.content);
+      }
+    }).join(" ");
+  }
+
   function assert(bool) {
     if (!bool) {
       throw new Error("Assertion failed");
@@ -66,7 +76,12 @@ function vmWriter(parseTree: {}, className: string): string[] {
   }
 
   function findType(content, type) {
-    return (filterType(content, type) || [])[0];
+    const result = filterType(content, type);
+    if (result.length === 0) {
+      return {};
+    } else {
+      return result[0];
+    }
   }
 
   // terminal write* methods
@@ -221,7 +236,23 @@ function vmWriter(parseTree: {}, className: string): string[] {
   }
 
   function writeIfStatement(statementContent): string[] {
-    return [];
+    const falseLabel = generateLabel('IF_FALSE');
+    const endLabel = generateLabel('IF_END');
+
+    const ifCondition = statementContent[2].content;
+    const ifBody = statementContent[5].content;
+    const elseBody = statementContent[9].content;
+
+    return _.flatten([
+      writeExpression(ifCondition),
+      writeUnaryOp('~'), // negate if condition so we can jump to else if false
+      writeIfGoto(falseLabel),
+      writeStatements(ifBody),
+      writeGoto(endLabel),
+      writeLabel(falseLabel),
+      writeStatements(elseBody),
+      writeLabel(endLabel)
+    ]);
   }
 
   function writeWhileStatement(statementContent): string[] {
@@ -230,7 +261,6 @@ function vmWriter(parseTree: {}, className: string): string[] {
 
     const whileCondition = statementContent[2].content;
     const whileBody = statementContent[5].content;
-    pp('while', statementContent);
 
     return _.flatten([
       writeLabel(startLabel),
@@ -238,7 +268,8 @@ function vmWriter(parseTree: {}, className: string): string[] {
       writeUnaryOp('~'), // negate while condition so we can jump to end if false
       writeIfGoto(endLabel),
       writeStatements(whileBody),
-      writeGoto(startLabel)
+      writeGoto(startLabel),
+      writeLabel(endLabel)
     ]);
   }
 
@@ -268,7 +299,8 @@ function vmWriter(parseTree: {}, className: string): string[] {
   }
 
   function writeStatement(statement): string[] {
-    return statementTypes[statement.type](statement.content);
+    const str = "// " + toString(statement.content);
+    return [str].concat(statementTypes[statement.type](statement.content));
   }
 
   function writeStatements(statements): string[] {
@@ -283,7 +315,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     const parameters = subroutineContent[4]; // probably don't need
     const bodyContent = subroutineContent[6].content;
 
-    const bodyVarDecs = findType(bodyContent, 'varDec').content;
+    const bodyVarDecs = findType(bodyContent, 'varDec').content || [];
     const bodyStatements = findType(bodyContent, 'statements').content;
 
     return _.flatten([
@@ -293,7 +325,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
   }
 
   function writeClass(classContent): string[] {
-    const subroutines = filterType(classContent, 'subroutineDec').slice(0, 2);
+    const subroutines = filterType(classContent, 'subroutineDec');
     return _.flatMap(subroutines, subroutine => writeSubroutine(subroutine.content));
   }
 

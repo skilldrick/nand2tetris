@@ -77,7 +77,7 @@ function main() {
     const writerOutput = vmWriter(parseTree, className);
 
     const output = writerOutput.join("\n");
-    //const output = convertToXml(processed).join("\n");
+    //const output = convertToXml(parseTree).join("\n");
 
     if (debug) {
       console.log(output);
