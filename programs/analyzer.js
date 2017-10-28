@@ -65,7 +65,7 @@ function main() {
     jackFiles = [inputFilePath];
   }
 
-  const debugOutput = jackFiles.map(filePath => {
+  jackFiles.forEach(filePath => {
     const className = path.basename(filePath).replace(/\.\w+$/, '');
     const outputFilePath = filePath.replace(/\.\w+$/, '.vm');
     const file = fs.readFileSync(filePath, 'utf8');

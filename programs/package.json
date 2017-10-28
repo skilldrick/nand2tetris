@@ -3,16 +3,22 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "flow": "flow",
+    "build": "flow-remove-types ./*.js -d lib/"
   },
   "author": "",
   "license": "ISC",
   "bin": {
     "hackassemble": "assembler.js",
     "hacktranslate": "translator.js",
-    "hackparse": "analyzer.js"
+    "hackparse": "hackparse.sh",
+    "hackparse2": "lib/analyzer.js"
   },
   "dependencies": {
     "lodash": "^4.17.4"
+  },
+  "devDependencies": {
+    "flow-bin": "^0.57.3",
+    "flow-remove-types": "^1.2.3"
   }
 }
