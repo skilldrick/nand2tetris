@@ -11,7 +11,10 @@ function vmWriter(parseTree) {
     'returnStatement': writeReturnStatement
   };
 
-  const unaryOperators = ['-', '~'];
+  const unaryOperators = {
+    '-': 'neg',
+    '~': 'not'
+  };
 
   const binaryOperators = {
     '+': 'add',
@@ -27,6 +30,8 @@ function vmWriter(parseTree) {
     '*': 'Math.multiply',
     '/': 'Math.divide',
   };
+
+  const booleans = ['true', 'false'];
 
   function assert(bool) {
     if (!bool) {
@@ -46,6 +51,10 @@ function vmWriter(parseTree) {
     }
   }
 
+  function findType(content, type) {
+    return (filterType(content, type) || [])[0];
+  }
+
   // terminal write* methods
 
   function writeFunction(name, nLocals) {
@@ -56,11 +65,19 @@ function vmWriter(parseTree) {
     return ["call", name, nArgs].join(" ");
   }
 
-  function writePush(location, value) {
-    return ["push", location, value].join(" ");
+  function writePush(segment, index) {
+    return ["push", segment, index].join(" ");
   }
 
-  function writeOp(op) {
+  function writePop(segment, index) {
+    return ["pop", segment, index].join(" ");
+  }
+
+  function writeUnaryOp(op) {
+    return unaryOperators[op];
+  }
+
+  function writeBinaryOp(op) {
     return binaryOperators[op];
   }
 
@@ -70,11 +87,38 @@ function vmWriter(parseTree) {
 
   // non-terminal write* methods
 
+  //TODO: dedupe with writeDoStatement
+  function writeMethodCall(content) {
+    pp('method', content);
+    const methodName = content.slice(0, -3).map(el => el.value).join("");
+    const fullMethodName = (methodName.indexOf('.') === -1) ? className + "." + methodName : methodName;
+    const argsContent = content[content.length - 2].content;
+    const args = argsContent.filter(el => el.type === "expression");
+
+    return [
+      ..._.flatMap(args, arg => writeExpression(arg.content)),
+      writeCall(fullMethodName, args.length)
+    ];
+  }
+
   function writeTerm(term) {
     if (term[0].type === 'integerConstant') {
       // integer constant
-      return [writePush('constant', term[0].value)];
-    } else if (unaryOperators.includes(term[0].value)) {
+      return [
+        writePush('constant', term[0].value)
+      ];
+    } else if (booleans.includes(term[0].value)) {
+      if (term[0].value === 'true') {
+        return [
+          writePush('constant', 0),
+          writeUnaryOp('~')
+        ];
+      } else {
+        return [
+          writePush('constant', 0)
+        ];
+      }
+    } else if (unaryOperators.hasOwnProperty(term[0].value)) {
       // unary operator
       assert(term.length === 2);
       return writeUnaryExpression(term);
@@ -82,7 +126,14 @@ function vmWriter(parseTree) {
       // parenthesized expression
       assert(term.length === 3 && term[2].value === ')');
       return writeExpression(term[1].content);
+    } else if (term[0].kind === 'class') {
+      assert(term[1].value === '.' && term.length === 6);
+      return writeMethodCall(term);
+    } else if (term[0].kind) {
+      return writePush(term[0].kind, term[0].index);
     } else {
+      pp('failed term', term);
+      assert(false);
       return [];
     }
   }
@@ -91,8 +142,9 @@ function vmWriter(parseTree) {
     return [
       ...writeTerm(expr[0].content),
       ...writeTerm(expr[2].content),
-      writeOp(expr[1].value)
+      writeBinaryOp(expr[1].value)
     ];
+    h
   }
 
   function writeBinaryExpressionWithFunc(expr) {
@@ -105,8 +157,8 @@ function vmWriter(parseTree) {
 
   function writeUnaryExpression(expr) {
     return [
-      writeTerm(expr[1]),
-      writeOp(expr[0].value)
+      ...writeTerm(expr[1].content),
+      writeUnaryOp(expr[0].value)
     ];
   }
 
@@ -120,13 +172,22 @@ function vmWriter(parseTree) {
       assert(expr.length === 3);
       return writeBinaryExpressionWithFunc(expr);
     } else {
-      pp('expr', expr);
+      pp('failed expr', expr);
       assert(false);
     }
   }
 
   function writeLetStatement(statementContent) {
-    
+    const variable = statementContent[1];
+    const variableKind = variable.kind;
+    const variableIndex = variable.index;
+
+    const expr = statementContent[3].content;
+
+    return [
+      ...writeExpression(expr),
+      writePop(variableKind, variableIndex)
+    ];
   }
 
   function writeIfStatement(statementContent) {
@@ -134,7 +195,7 @@ function vmWriter(parseTree) {
   }
 
   function writeWhileStatement(statementContent) {
-    
+    // TODO: next
   }
 
   function writeDoStatement(statementContent) {
@@ -174,10 +235,10 @@ function vmWriter(parseTree) {
     const name = subroutineContent[2].value;
     const fullName = className + "." + name;
     const parameters = subroutineContent[4]; // probably don't need
-    const bodyContent = subroutineContent[6].content[1].content;
+    const bodyContent = subroutineContent[6].content;
 
-    const bodyVarDecs = filterType(bodyContent, 'varDec');
-    const bodyStatements = filterType(bodyContent, Object.keys(statementTypes));
+    const bodyVarDecs = findType(bodyContent, 'varDec').content;
+    const bodyStatements = findType(bodyContent, 'statements').content;
 
     return [
       writeFunction(fullName, bodyVarDecs.length),
@@ -187,7 +248,7 @@ function vmWriter(parseTree) {
 
   function writeClass(classContent) {
     className = classContent[1].value;
-    const subroutines = filterType(classContent, 'subroutineDec');
+    const subroutines = filterType(classContent, 'subroutineDec').slice(0, 2);
     return _.flatMap(subroutines, subroutine => writeSubroutine(subroutine.content));
   }
 

@@ -155,6 +155,10 @@ function parse(tokens) {
     if (nextValueIsOneOf(varTypes)) {
       let varType = getToken().value;
 
+      if (varType === 'var') {
+        varType = 'local';
+      }
+
       return {
         type: type,
         content: [

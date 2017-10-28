@@ -2,7 +2,7 @@ function symbolTable(name) {
   const table = {};
 
   const indexes = {
-    var: 0,
+    local: 0,
     argument: 0,
     static: 0,
     field: 0,
