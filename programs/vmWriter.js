@@ -1,8 +1,20 @@
 const _ = require('lodash');
 
-function vmWriter(parseTree) {
-  let className; // might not need this?
+const generateLabel = (() => {
+  const labelIndexes = {
+    'IF_TRUE': 0,
+    'IF_FALSE': 0,
+    'IF_END': 0,
+    'WHILE_START': 0,
+    'WHILE_END': 0
+  };
 
+  return function generateLabel(type) {
+    return type + labelIndexes[type]++;
+  }
+})();
+
+function vmWriter(parseTree, className) {
   const statementTypes = {
     'letStatement': writeLetStatement,
     'ifStatement': writeIfStatement,
@@ -85,11 +97,22 @@ function vmWriter(parseTree) {
     return "return";
   }
 
+  function writeLabel(label) {
+    return ["label", label].join(" ");
+  }
+
+  function writeGoto(label) {
+    return ["goto", label].join(" ");
+  }
+
+  function writeIfGoto(label) {
+    return ["if-goto", label].join(" ");
+  }
+
   // non-terminal write* methods
 
   //TODO: dedupe with writeDoStatement
   function writeMethodCall(content) {
-    pp('method', content);
     const methodName = content.slice(0, -3).map(el => el.value).join("");
     const fullMethodName = (methodName.indexOf('.') === -1) ? className + "." + methodName : methodName;
     const argsContent = content[content.length - 2].content;
@@ -107,17 +130,17 @@ function vmWriter(parseTree) {
       return [
         writePush('constant', term[0].value)
       ];
-    } else if (booleans.includes(term[0].value)) {
-      if (term[0].value === 'true') {
-        return [
-          writePush('constant', 0),
-          writeUnaryOp('~')
-        ];
-      } else {
-        return [
-          writePush('constant', 0)
-        ];
-      }
+    } else if (term[0].value === 'true') {
+      // true
+      return [
+        writePush('constant', 1),
+        writeUnaryOp('-')
+      ];
+    } else if (term[0].value === 'false' || term[0].value === 'null') {
+      // false and null
+      return [
+        writePush('constant', 0)
+      ];
     } else if (unaryOperators.hasOwnProperty(term[0].value)) {
       // unary operator
       assert(term.length === 2);
@@ -130,7 +153,9 @@ function vmWriter(parseTree) {
       assert(term[1].value === '.' && term.length === 6);
       return writeMethodCall(term);
     } else if (term[0].kind) {
-      return writePush(term[0].kind, term[0].index);
+      return [
+        writePush(term[0].kind, term[0].index)
+      ];
     } else {
       pp('failed term', term);
       assert(false);
@@ -195,7 +220,21 @@ function vmWriter(parseTree) {
   }
 
   function writeWhileStatement(statementContent) {
-    // TODO: next
+    const startLabel = generateLabel('WHILE_START');
+    const endLabel = generateLabel('WHILE_END');
+
+    const whileCondition = statementContent[2].content;
+    const whileBody = statementContent[5].content;
+    pp('while', statementContent);
+
+    return [
+      writeLabel(startLabel),
+      ...writeExpression(whileCondition),
+      writeUnaryOp('~'), // negate while condition so we can jump to end if false
+      writeIfGoto(endLabel),
+      ...writeStatements(whileBody),
+      writeGoto(startLabel)
+    ];
   }
 
   function writeDoStatement(statementContent) {
@@ -230,6 +269,11 @@ function vmWriter(parseTree) {
     return statementTypes[statement.type](statement.content);
   }
 
+  function writeStatements(statements) {
+    return _.flatMap(statements, writeStatement)
+
+  }
+
   function writeSubroutine(subroutineContent) {
     const returnType = subroutineContent[1];
     const name = subroutineContent[2].value;
@@ -242,12 +286,11 @@ function vmWriter(parseTree) {
 
     return [
       writeFunction(fullName, bodyVarDecs.length),
-      ..._.flatMap(bodyStatements, writeStatement)
+      ...writeStatements(bodyStatements)
     ];
   }
 
   function writeClass(classContent) {
-    className = classContent[1].value;
     const subroutines = filterType(classContent, 'subroutineDec').slice(0, 2);
     return _.flatMap(subroutines, subroutine => writeSubroutine(subroutine.content));
   }

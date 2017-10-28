@@ -66,6 +66,7 @@ function main() {
   }
 
   const debugOutput = jackFiles.map(filePath => {
+    const className = path.basename(filePath).replace(/\.\w+$/, '');
     const outputFilePath = filePath.replace(/\.\w+$/, '.vm');
     const file = fs.readFileSync(filePath, 'utf8');
 
@@ -73,7 +74,7 @@ function main() {
 
     const parseTree = parse(tokens);
 
-    const writerOutput = vmWriter(parseTree);
+    const writerOutput = vmWriter(parseTree, className);
 
     const output = writerOutput.join("\n");
     //const output = convertToXml(processed).join("\n");
