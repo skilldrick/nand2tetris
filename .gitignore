@@ -1,7 +1,14 @@
 *.out
 *.zip
+*.xml
 07/*/*/*.asm
 07/*.asm
+07/*.vm
 08/*/*/*.asm
 08/*.asm
+08/*.vm
+11/*/*.vm
 programs/node_modules
+programs/.flowconfig
+programs/lib
+programs/package-lock.json
