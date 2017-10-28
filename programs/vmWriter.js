@@ -113,17 +113,20 @@ function vmWriter(parseTree: {}, className: string): string[] {
 
   // non-terminal write* methods
 
-  //TODO: dedupe with writeDoStatement
-  function writeMethodCall(content): string[] {
+  function writeMethodCall(name, args): string[] {
+    return _.flatten([
+      _.flatMap(args, arg => writeExpression(arg.content)),
+      writeCall(name, args.length)
+    ]);
+  }
+
+  function writeObjectDotMethodCall(content): string[] {
     const methodName = content.slice(0, -3).map(el => el.value).join("");
     const fullMethodName = (methodName.indexOf('.') === -1) ? className + "." + methodName : methodName;
     const argsContent = content[content.length - 2].content;
     const args = argsContent.filter(el => el.type === "expression");
 
-    return _.flatten([
-      _.flatMap(args, arg => writeExpression(arg.content)),
-      writeCall(fullMethodName, args.length)
-    ]);
+    return writeMethodCall(fullMethodName, args);
   }
 
   function writeTerm(term): string[] {
@@ -153,7 +156,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
       return writeExpression(term[1].content);
     } else if (term[0].kind === 'class') {
       assert(term[1].value === '.' && term.length === 6);
-      return writeMethodCall(term);
+      return writeObjectDotMethodCall(term);
     } else if (term[0].kind) {
       return [
         writePush(term[0].kind, term[0].index)
@@ -246,10 +249,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     const argsContent = statementContent[statementContent.length - 3].content;
     const args = argsContent.filter(el => el.type === "expression");
 
-    return _.flatten([
-      _.flatMap(args, arg => writeExpression(arg.content)),
-      writeCall(fullMethodName, args.length)
-    ]);
+    return writeMethodCall(fullMethodName, args);
   }
 
   function writeReturnStatement(statementContent): string[] {
