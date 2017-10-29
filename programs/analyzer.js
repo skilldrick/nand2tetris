@@ -43,7 +43,7 @@ function convertToXml(arr, indent = 0) {
       ];
     } else {
       return [
-        space(indent) + openingTag(el.type) + " " + encode(el.value) + " " + closingTag(el.type)
+        space(indent) + openingTag(el.type) + " " + encode(el.value) + " " + JSON.stringify(el) + " " + closingTag(el.type)
       ];
     }
   });

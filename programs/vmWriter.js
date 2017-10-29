@@ -47,7 +47,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
 
   const booleans = ['true', 'false'];
 
-  function toString(tokens: {}[]): string {
+  function toString(tokens): string {
     return tokens.map(token => {
       if (token.value) {
         return token.value;
@@ -84,6 +84,15 @@ function vmWriter(parseTree: {}, className: string): string[] {
     }
   }
 
+  function convertSegment(segment: string) {
+    const segmentMap = {
+      'var': 'local',
+      'field': 'this'
+    };
+
+    return segmentMap[segment] || segment;
+  }
+
   // terminal write* methods
 
   function writeFunction(name, nLocals): string {
@@ -95,11 +104,11 @@ function vmWriter(parseTree: {}, className: string): string[] {
   }
 
   function writePush(segment, index): string {
-    return ["push", segment, index].join(" ");
+    return ["push", convertSegment(segment), index].join(" ");
   }
 
   function writePop(segment, index): string {
-    return ["pop", segment, index].join(" ");
+    return ["pop", convertSegment(segment), index].join(" ");
   }
 
   function writeUnaryOp(op): string {
@@ -129,6 +138,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
   // non-terminal write* methods
 
   function writeMethodCall(name, args): string[] {
+    //TODO: need to pass `this`
     return _.flatten([
       _.flatMap(args, arg => writeExpression(arg.content)),
       writeCall(name, args.length)
@@ -160,6 +170,10 @@ function vmWriter(parseTree: {}, className: string): string[] {
       // false and null
       return [
         writePush('constant', 0)
+      ];
+    } else if (term[0].type === 'keyword' && term[0].value === 'this') {
+      return [
+        writePush('this', 0)
       ];
     } else if (unaryOperators.hasOwnProperty(term[0].value)) {
       // unary operator
@@ -241,18 +255,31 @@ function vmWriter(parseTree: {}, className: string): string[] {
 
     const ifCondition = statementContent[2].content;
     const ifBody = statementContent[5].content;
-    const elseBody = statementContent[9].content;
 
-    return _.flatten([
-      writeExpression(ifCondition),
-      writeUnaryOp('~'), // negate if condition so we can jump to else if false
-      writeIfGoto(falseLabel),
-      writeStatements(ifBody),
-      writeGoto(endLabel),
-      writeLabel(falseLabel),
-      writeStatements(elseBody),
-      writeLabel(endLabel)
-    ]);
+    if (!statementContent[9]) {
+      // no else
+      return _.flatten([
+        writeExpression(ifCondition),
+        writeUnaryOp('~'), // negate if condition so we can jump to else if false
+        writeIfGoto(endLabel),
+        writeStatements(ifBody),
+        writeLabel(endLabel)
+      ]);
+    } else {
+      const elseBody = statementContent[9].content;
+
+      return _.flatten([
+        writeExpression(ifCondition),
+        writeUnaryOp('~'), // negate if condition so we can jump to else if false
+        writeIfGoto(falseLabel),
+        writeStatements(ifBody),
+        writeGoto(endLabel),
+        writeLabel(falseLabel),
+        writeStatements(elseBody),
+        writeLabel(endLabel)
+      ]);
+
+    }
   }
 
   function writeWhileStatement(statementContent): string[] {
@@ -305,21 +332,34 @@ function vmWriter(parseTree: {}, className: string): string[] {
 
   function writeStatements(statements): string[] {
     return _.flatMap(statements, writeStatement)
+  }
 
+  function writeConstructorInit(): string[] {
+    const table: { [string]: { kind: string } } = parseTree[0].symbolTable;
+    const kinds = Object.keys(table).map(key => table[key].kind);
+    const fields = kinds.filter(kind => kind === 'field').length;
+
+    return [
+      writePush("const", fields),
+      writeCall("Memory.alloc", 1),
+      writePop("pointer", 0)
+    ];
   }
 
   function writeSubroutine(subroutineContent): string[] {
     const returnType = subroutineContent[1];
     const name = subroutineContent[2].value;
     const fullName = className + "." + name;
-    const parameters = subroutineContent[4]; // probably don't need
     const bodyContent = subroutineContent[6].content;
 
     const bodyVarDecs = findType(bodyContent, 'varDec').content || [];
     const bodyStatements = findType(bodyContent, 'statements').content;
 
+    const subroutineType = subroutineContent[0].value;
+
     return _.flatten([
       writeFunction(fullName, bodyVarDecs.length),
+      (subroutineType === 'constructor') ? writeConstructorInit() : [],
       writeStatements(bodyStatements)
     ]);
   }

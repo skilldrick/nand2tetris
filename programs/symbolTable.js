@@ -2,7 +2,7 @@ function symbolTable(name) {
   const table = {};
 
   const indexes = {
-    local: 0,
+    var: 0,
     argument: 0,
     static: 0,
     field: 0,
@@ -16,19 +16,23 @@ function symbolTable(name) {
         return;
       }
       const index = indexes[kind]++;
+
+      console.log("fooo", name, type, kind);
+
+      if (table.hasOwnProperty(name)) {
+        throw new Error(name + " already exists in symbol table");
+      }
+
       table[name] = { name, type, kind, index };
     },
     get: (name) => {
       if (table.hasOwnProperty(name)) {
         return table[name];
       } else {
-        if (name[0].match(/[A-Z]/)) {
-          return { name: name, kind: 'class' };
-        } else {
-          return { name: name, kind: 'method' };
-        }
+        return null;
       }
-    }
+    },
+    table: table
   };
 }
 

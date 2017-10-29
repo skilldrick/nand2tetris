@@ -12,8 +12,18 @@ function parse(tokens) {
   let currentClassSymbolTable, currentSubroutineSymbolTable;
   let mostRecentTypeDefinition; // super hacky but (shrug)
 
+  function getSymbolFallback(name) {
+    if (name[0].match(/[A-Z]/)) {
+      return { name: name, kind: 'class' };
+    } else {
+      return { name: name, kind: 'method' };
+    }
+  }
+
   function getSymbol(name) {
-    return currentSubroutineSymbolTable.get(name) || currentClassSymbolTable.get(name);
+    return currentSubroutineSymbolTable.get(name) ||
+      currentClassSymbolTable.get(name) ||
+      getSymbolFallback(name);
   }
 
   function moreTokens() {
@@ -154,10 +164,6 @@ function parse(tokens) {
   function consumeVarDec(type, varTypes) {
     if (nextValueIsOneOf(varTypes)) {
       let varType = getToken().value;
-
-      if (varType === 'var') {
-        varType = 'local';
-      }
 
       return {
         type: type,
@@ -503,7 +509,7 @@ function parse(tokens) {
   }
 
   function consumeClass() {
-    return {
+    const cls = {
       type: 'class',
       content: [
         consumeKeyword('class'),
@@ -514,6 +520,10 @@ function parse(tokens) {
         consumeSymbol('}'),
       ]
     };
+
+    cls.symbolTable = currentClassSymbolTable.table;
+
+    return cls;
   }
 
   let parseTree = [consumeClass()];
