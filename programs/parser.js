@@ -11,6 +11,7 @@ function parse(tokens) {
 
   let currentClassSymbolTable, currentSubroutineSymbolTable;
   let mostRecentTypeDefinition; // super hacky but (shrug)
+  let mostRecentSubroutineType; // unused
 
   function getSymbolFallback(name) {
     if (name[0].match(/[A-Z]/)) {
@@ -91,6 +92,7 @@ function parse(tokens) {
         currentClassSymbolTable = symbolTable(token.value);
       } else if (category === 'subroutine') {
         currentSubroutineSymbolTable = symbolTable(token.value);
+        //currentClassSymbolTable.add(token.value, mostRecentSubroutineType.value, category);
       } else if (category === 'static' || category === 'field') {
         currentClassSymbolTable.add(token.value, mostRecentTypeDefinition, category);
       } else {
@@ -491,10 +493,12 @@ function parse(tokens) {
     }
 
     if (nextValueIsOneOf(subroutineTypes)) {
+      mostRecentSubroutineType = consumeKeyword(subroutineTypes);
+
       return {
         type: 'subroutineDec',
         content: [
-          consumeKeyword(subroutineTypes),
+          mostRecentSubroutineType,
           consumeSubroutineReturnType(),
           consumeIdentifier('subroutine', true),
           consumeSymbol('('),

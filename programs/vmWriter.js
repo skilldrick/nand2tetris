@@ -1,4 +1,4 @@
-// @flow
+/* @flow */
 
 const _ = require('lodash');
 
@@ -137,12 +137,82 @@ function vmWriter(parseTree: {}, className: string): string[] {
 
   // non-terminal write* methods
 
-  function writeMethodCall(name, args): string[] {
-    //TODO: need to pass `this`
+  function writeFunctionCall(fullName, args): Array<string> {
+    return _.flatten([
+      _.flatMap(args, arg => writeExpression(arg.content)),
+      writeCall(fullName, args.length)
+    ]);
+  }
+
+  function writeMethodCall(receiver, name, args): Array<string> {
+    let receiverName;
+
+    if (receiver.value === 'this') {
+      receiverName = className;
+    } else {
+      receiverName = receiver.type;
+    }
+
+    const fullName = receiverName + "." + name;
+    const fullArgs = [{ type: "expression", content: [ { type: "term", content: [receiver] } ] }].concat(args);
+
+    return _.flatten([
+      _.flatMap(fullArgs, arg => writeExpression(arg.content)),
+      writeCall(fullName, fullArgs.length)
+    ]);
+
+  }
+
+  function writeSubroutineCall(receiver, name, args): Array<string> {
+    let receiverName;
+
+    let isMethodCall;
+
+    if (receiver.kind === 'class') {
+      receiverName = receiver.value;
+      isMethodCall = false;
+    } else if (receiver.value === 'this') {
+      receiverName = className;
+      isMethodCall = true;
+    } else { // is method call
+      receiverName = receiver.type;
+      isMethodCall = true;
+    }
+
+    console.log("FOOO", receiverName, name);
+    const fullName = receiverName + "." + name;
+
+    let fullArgs;
+
+    if (isMethodCall) {
+      fullArgs = [{ type: "expression", content: [ { type: "term", content: [receiver] } ] }].concat(args);
+    } else {
+      fullArgs = args;
+    }
+
+    pp('fullArgs', fullArgs);
+
+    return _.flatten([
+      _.flatMap(fullArgs, arg => writeExpression(arg.content)),
+      writeCall(name, fullArgs.length)
+    ]);
+  }
+
+  function writeMethodCallOld(name, args): string[] {
     return _.flatten([
       _.flatMap(args, arg => writeExpression(arg.content)),
       writeCall(name, args.length)
     ]);
+  }
+
+  // TODO: redo this with writeFunctionCall
+  function writeClassDotMethodCall(content): string[] {
+    const methodName = content.slice(0, -3).map(el => el.value).join("");
+    const fullMethodName = (methodName.indexOf('.') === -1) ? className + "." + methodName : methodName;
+    const argsContent = content[content.length - 2].content;
+    const args = argsContent.filter(el => el.type === "expression");
+
+    return writeMethodCallOld(fullMethodName, args);
   }
 
   function writeObjectDotMethodCall(content): string[] {
@@ -151,7 +221,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     const argsContent = content[content.length - 2].content;
     const args = argsContent.filter(el => el.type === "expression");
 
-    return writeMethodCall(fullMethodName, args);
+    return writeMethodCallOld(fullMethodName, args);
   }
 
   function writeTerm(term): string[] {
@@ -173,7 +243,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
       ];
     } else if (term[0].type === 'keyword' && term[0].value === 'this') {
       return [
-        writePush('this', 0)
+        writePush('pointer', 0)
       ];
     } else if (unaryOperators.hasOwnProperty(term[0].value)) {
       // unary operator
@@ -184,6 +254,9 @@ function vmWriter(parseTree: {}, className: string): string[] {
       assert(term.length === 3 && term[2].value === ')');
       return writeExpression(term[1].content);
     } else if (term[0].kind === 'class') {
+      assert(term[1].value === '.' && term.length === 6);
+      return writeClassDotMethodCall(term);
+    } else if (term[1] && term[1].value === '.') {
       assert(term[1].value === '.' && term.length === 6);
       return writeObjectDotMethodCall(term);
     } else if (term[0].kind) {
@@ -301,13 +374,31 @@ function vmWriter(parseTree: {}, className: string): string[] {
   }
 
   function writeDoStatement(statementContent): string[] {
-    // slice the `do` off the beginning and the `(`, expression list, `)`, and `;` off the end
-    const methodName = statementContent.slice(1, -4).map(el => el.value).join("");
-    const fullMethodName = (methodName.indexOf('.') === -1) ? className + "." + methodName : methodName;
+    // do Foo.bar()   Foo is class, bar is function on class, name is Foo.bar
+    // do foo.baz()   foo is receiver, baz is method on receiver, name is Foo.baz
+    // do baz()       `this` is receiver, baz is method on this, name is Foo.baz
+
+    const hasExplicitReceiver = statementContent[2].value === '.';
+    let receiver;
+    let name;
+
     const argsContent = statementContent[statementContent.length - 3].content;
     const args = argsContent.filter(el => el.type === "expression");
 
-    return writeMethodCall(fullMethodName, args);
+
+    if (hasExplicitReceiver) {
+      receiver = statementContent[1];
+      name = statementContent[3];
+    } else {
+      receiver = { type: 'keyword', value: 'this' };
+      name = statementContent[1];
+    }
+
+    if (receiver.kind === 'class') {
+      return writeFunctionCall(receiver.value + "." + name.name, args);
+    } else {
+      return writeMethodCall(receiver, name.name, args);
+    }
   }
 
   function writeReturnStatement(statementContent): string[] {

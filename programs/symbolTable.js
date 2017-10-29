@@ -11,13 +11,7 @@ function symbolTable(name) {
 
   return {
     add: (name, type, kind) => {
-      if (kind === 'subroutine') {
-        console.log("TRIED TO ADD A SUBROUTINE");
-        return;
-      }
       const index = indexes[kind]++;
-
-      console.log("fooo", name, type, kind);
 
       if (table.hasOwnProperty(name)) {
         throw new Error(name + " already exists in symbol table");
