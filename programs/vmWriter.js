@@ -16,7 +16,7 @@ const generateLabel = (() => {
   }
 })();
 
-function vmWriter(parseTree: {}, className: string): string[] {
+function vmWriter(parseTree: {}, className: string): Array<string> {
   const statementTypes = {
     'letStatement': writeLetStatement,
     'ifStatement': writeIfStatement,
@@ -154,7 +154,13 @@ function vmWriter(parseTree: {}, className: string): string[] {
     }
 
     const fullName = receiverName + "." + name;
-    const fullArgs = [{ type: "expression", content: [ { type: "term", content: [receiver] } ] }].concat(args);
+    const thisArg = {
+      type: "expression",
+      content: [
+        { type: "term", content: [receiver] }
+      ]
+    };
+    const fullArgs = [thisArg].concat(args);
 
     return _.flatten([
       _.flatMap(fullArgs, arg => writeExpression(arg.content)),
@@ -163,68 +169,40 @@ function vmWriter(parseTree: {}, className: string): string[] {
 
   }
 
-  function writeSubroutineCall(receiver, name, args): Array<string> {
-    let receiverName;
+  function writeFunctionCallFromTerm(content): Array<string> {
+    const className = content[0].name;
+    const functionName = content[2].name;
 
-    let isMethodCall;
+    const fullName = className + "." + functionName;
 
-    if (receiver.kind === 'class') {
-      receiverName = receiver.value;
-      isMethodCall = false;
-    } else if (receiver.value === 'this') {
-      receiverName = className;
-      isMethodCall = true;
-    } else { // is method call
-      receiverName = receiver.type;
-      isMethodCall = true;
-    }
-
-    console.log("FOOO", receiverName, name);
-    const fullName = receiverName + "." + name;
-
-    let fullArgs;
-
-    if (isMethodCall) {
-      fullArgs = [{ type: "expression", content: [ { type: "term", content: [receiver] } ] }].concat(args);
-    } else {
-      fullArgs = args;
-    }
-
-    pp('fullArgs', fullArgs);
-
-    return _.flatten([
-      _.flatMap(fullArgs, arg => writeExpression(arg.content)),
-      writeCall(name, fullArgs.length)
-    ]);
-  }
-
-  function writeMethodCallOld(name, args): string[] {
-    return _.flatten([
-      _.flatMap(args, arg => writeExpression(arg.content)),
-      writeCall(name, args.length)
-    ]);
-  }
-
-  // TODO: redo this with writeFunctionCall
-  function writeClassDotMethodCall(content): string[] {
-    const methodName = content.slice(0, -3).map(el => el.value).join("");
-    const fullMethodName = (methodName.indexOf('.') === -1) ? className + "." + methodName : methodName;
     const argsContent = content[content.length - 2].content;
     const args = argsContent.filter(el => el.type === "expression");
 
-    return writeMethodCallOld(fullMethodName, args);
+    return writeFunctionCall(fullName, args);
   }
 
-  function writeObjectDotMethodCall(content): string[] {
-    const methodName = content.slice(0, -3).map(el => el.value).join("");
-    const fullMethodName = (methodName.indexOf('.') === -1) ? className + "." + methodName : methodName;
+  function writeMethodCallWithObject(content): Array<string> {
+    const object = content[0];
+    const methodName = content[2].name;
+
     const argsContent = content[content.length - 2].content;
     const args = argsContent.filter(el => el.type === "expression");
 
-    return writeMethodCallOld(fullMethodName, args);
+    return writeMethodCall(object, methodName, args);
   }
 
-  function writeTerm(term): string[] {
+  function writeMethodCallWithoutObject(content): Array<string> {
+    const methodName = content[0].name;
+
+    const argsContent = content[content.length - 2].content;
+    const args = argsContent.filter(el => el.type === "expression");
+
+    const receiver = { type: 'keyword', value: 'this' };
+
+    return writeMethodCall(receiver, methodName, args);
+  }
+
+  function writeTerm(term): Array<string> {
     if (term[0].type === 'integerConstant') {
       // integer constant
       return [
@@ -255,10 +233,13 @@ function vmWriter(parseTree: {}, className: string): string[] {
       return writeExpression(term[1].content);
     } else if (term[0].kind === 'class') {
       assert(term[1].value === '.' && term.length === 6);
-      return writeClassDotMethodCall(term);
+      return writeFunctionCallFromTerm(term);
     } else if (term[1] && term[1].value === '.') {
       assert(term[1].value === '.' && term.length === 6);
-      return writeObjectDotMethodCall(term);
+      return writeMethodCallWithObject(term);
+    } else if (term[1] && term[1].value === '(') {
+      assert(term.length === 4);
+      return writeMethodCallWithoutObject(term);
     } else if (term[0].kind) {
       return [
         writePush(term[0].kind, term[0].index)
@@ -270,7 +251,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     }
   }
 
-  function writeBinaryExpression(expr): string[] {
+  function writeBinaryExpression(expr): Array<string> {
     return _.flatten([
       writeTerm(expr[0].content),
       writeTerm(expr[2].content),
@@ -278,7 +259,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     ]);
   }
 
-  function writeBinaryExpressionWithFunc(expr): string[] {
+  function writeBinaryExpressionWithFunc(expr): Array<string> {
     return _.flatten([
       writeTerm(expr[0].content),
       writeTerm(expr[2].content),
@@ -286,14 +267,14 @@ function vmWriter(parseTree: {}, className: string): string[] {
     ]);
   }
 
-  function writeUnaryExpression(expr): string[] {
+  function writeUnaryExpression(expr): Array<string> {
     return _.flatten([
       writeTerm(expr[1].content),
       writeUnaryOp(expr[0].value)
     ]);
   }
 
-  function writeExpression(expr): string[] {
+  function writeExpression(expr): Array<string> {
     if (expr.length === 1) {
       return writeTerm(expr[0].content);
     } else if (binaryOperators.hasOwnProperty(expr[1].value)) {
@@ -309,7 +290,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     }
   }
 
-  function writeLetStatement(statementContent): string[] {
+  function writeLetStatement(statementContent): Array<string> {
     const variable = statementContent[1];
     const variableKind = variable.kind;
     const variableIndex = variable.index;
@@ -322,7 +303,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     ]);
   }
 
-  function writeIfStatement(statementContent): string[] {
+  function writeIfStatement(statementContent): Array<string> {
     const falseLabel = generateLabel('IF_FALSE');
     const endLabel = generateLabel('IF_END');
 
@@ -355,7 +336,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     }
   }
 
-  function writeWhileStatement(statementContent): string[] {
+  function writeWhileStatement(statementContent): Array<string> {
     const startLabel = generateLabel('WHILE_START');
     const endLabel = generateLabel('WHILE_END');
 
@@ -373,7 +354,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     ]);
   }
 
-  function writeDoStatement(statementContent): string[] {
+  function writeDoStatement(statementContent): Array<string> {
     // do Foo.bar()   Foo is class, bar is function on class, name is Foo.bar
     // do foo.baz()   foo is receiver, baz is method on receiver, name is Foo.baz
     // do baz()       `this` is receiver, baz is method on this, name is Foo.baz
@@ -384,7 +365,6 @@ function vmWriter(parseTree: {}, className: string): string[] {
 
     const argsContent = statementContent[statementContent.length - 3].content;
     const args = argsContent.filter(el => el.type === "expression");
-
 
     if (hasExplicitReceiver) {
       receiver = statementContent[1];
@@ -401,7 +381,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     }
   }
 
-  function writeReturnStatement(statementContent): string[] {
+  function writeReturnStatement(statementContent): Array<string> {
     let push;
     if (statementContent[1].value === ';') {
       // void return
@@ -416,16 +396,16 @@ function vmWriter(parseTree: {}, className: string): string[] {
     ]);
   }
 
-  function writeStatement(statement): string[] {
+  function writeStatement(statement): Array<string> {
     const str = "// " + toString(statement.content);
     return [str].concat(statementTypes[statement.type](statement.content));
   }
 
-  function writeStatements(statements): string[] {
+  function writeStatements(statements): Array<string> {
     return _.flatMap(statements, writeStatement)
   }
 
-  function writeConstructorInit(): string[] {
+  function writeConstructorInit(): Array<string> {
     const table: { [string]: { kind: string } } = parseTree[0].symbolTable;
     const kinds = Object.keys(table).map(key => table[key].kind);
     const fields = kinds.filter(kind => kind === 'field').length;
@@ -437,7 +417,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     ];
   }
 
-  function writeSubroutine(subroutineContent): string[] {
+  function writeSubroutine(subroutineContent): Array<string> {
     const returnType = subroutineContent[1];
     const name = subroutineContent[2].value;
     const fullName = className + "." + name;
@@ -455,7 +435,7 @@ function vmWriter(parseTree: {}, className: string): string[] {
     ]);
   }
 
-  function writeClass(classContent): string[] {
+  function writeClass(classContent): Array<string> {
     const subroutines = filterType(classContent, 'subroutineDec');
     return _.flatMap(subroutines, subroutine => writeSubroutine(subroutine.content));
   }

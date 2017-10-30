@@ -1,0 +1,37 @@
+class Test {
+  field int x, y;
+  field Test o;
+
+  constructor Test new() {
+    let x = 100;
+    let y = bar();
+    let o = Test.new();
+    return this;
+  }
+
+  function int foo() {
+    return 10;
+  }
+
+  method int bar() {
+    return foo();
+  }
+
+  method Test baz() {
+    var Test other;
+
+    let other = Test.new();
+
+    let x = x + other.bar(1, 2);
+    let x = x + o.bar(1, 2);
+    let x = x + bar(1, 2);
+    let x = x + Test.foo(1, 2);
+
+    do other.bar(1, 2);
+    do o.bar(1, 2);
+    do bar(1, 2);
+    do Test.foo(1, 2);
+
+    return other;
+  }
+}
