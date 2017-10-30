@@ -266,13 +266,6 @@ function parse(tokens) {
     ];
   }
 
-  function consumeMethodCall() {
-    return [
-      consumeIdentifier(null, false),
-      ...consumeOptionalMethodDereference()
-    ];
-  }
-
   function consumeParenthesizedExpression() {
     return [
       consumeSymbol('('),

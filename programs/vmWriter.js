@@ -375,9 +375,15 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
     }
 
     if (receiver.kind === 'class') {
-      return writeFunctionCall(receiver.value + "." + name.name, args);
+      return _.flatten([
+        writeFunctionCall(receiver.value + "." + name.name, args),
+        writePop('temp', 0)
+      ]);
     } else {
-      return writeMethodCall(receiver, name.name, args);
+      return _.flatten([
+        writeMethodCall(receiver, name.name, args),
+        writePop('temp', 0)
+      ]);
     }
   }
 
@@ -411,8 +417,15 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
     const fields = kinds.filter(kind => kind === 'field').length;
 
     return [
-      writePush("const", fields),
+      writePush("constant", fields),
       writeCall("Memory.alloc", 1),
+      writePop("pointer", 0)
+    ];
+  }
+
+  function writeMethodInit(): Array<string> {
+    return [
+      writePush("argument", 0),
       writePop("pointer", 0)
     ];
   }
@@ -431,6 +444,7 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
     return _.flatten([
       writeFunction(fullName, bodyVarDecs.length),
       (subroutineType === 'constructor') ? writeConstructorInit() : [],
+      (subroutineType === 'method') ? writeMethodInit() : [],
       writeStatements(bodyStatements)
     ]);
   }
