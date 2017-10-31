@@ -202,12 +202,29 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
     return writeMethodCall(receiver, methodName, args);
   }
 
+  function writeStringConstant(string): Array<string> {
+    const charAdds = _.flatMap(string.split(''), char => {
+      return [
+        writePush('constant', char.charCodeAt()),
+        writeCall('String.appendChar', 2)
+      ];
+    });
+
+    return _.flatten([
+      writePush('constant', string.length),
+      writeCall('String.new', 1),
+      charAdds
+    ]);
+  }
+
   function writeTerm(term): Array<string> {
     if (term[0].type === 'integerConstant') {
       // integer constant
       return [
         writePush('constant', term[0].value)
       ];
+    } else if (term[0].type === 'stringConstant') {
+      return writeStringConstant(term[0].value);
     } else if (term[0].value === 'true') {
       // true
       return [
@@ -436,13 +453,15 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
     const fullName = className + "." + name;
     const bodyContent = subroutineContent[6].content;
 
-    const bodyVarDecs = findType(bodyContent, 'varDec').content || [];
-    const bodyStatements = findType(bodyContent, 'statements').content;
+    const bodyVarDecs = filterType(bodyContent, 'varDec');
+    const localCount = _.sum(bodyVarDecs.map(dec => (dec.content.length - 2) / 2));
 
     const subroutineType = subroutineContent[0].value;
 
+    const bodyStatements = findType(bodyContent, 'statements').content;
+
     return _.flatten([
-      writeFunction(fullName, bodyVarDecs.length),
+      writeFunction(fullName, localCount),
       (subroutineType === 'constructor') ? writeConstructorInit() : [],
       (subroutineType === 'method') ? writeMethodInit() : [],
       writeStatements(bodyStatements)

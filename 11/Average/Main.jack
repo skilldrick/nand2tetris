@@ -11,6 +11,7 @@ class Main {
      var Array a; 
      var int length;
      var int i, sum;
+     var String str;
 
      let length = Keyboard.readInt("How many numbers? ");
      let a = Array.new(length); // constructs the array
