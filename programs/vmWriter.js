@@ -217,6 +217,26 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
     ]);
   }
 
+  function writeArrayAccess(term): Array<string> {
+    const array = term[0];
+    const arrayKind = array.kind;
+    const arrayIndex = array.index;
+    const arrayOffsetExpression = term[2].content;
+
+    return _.flatten([
+      // Add offset to array base address
+      writePush(arrayKind, arrayIndex),
+      writeExpression(arrayOffsetExpression),
+      writeBinaryOp('+'), // now destination address is top of stack
+
+      // pop destination address to that pointer
+      writePop('pointer', 1),
+
+      // push value at that 0 to stack
+      writePush('that', 0)
+    ]);
+  }
+
   function writeTerm(term): Array<string> {
     if (term[0].type === 'integerConstant') {
       // integer constant
@@ -244,6 +264,8 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
       // unary operator
       assert(term.length === 2);
       return writeUnaryExpression(term);
+    } else if (term[1] && term[1].value === '[') {
+      return writeArrayAccess(term);
     } else if (term[0].value === '(') {
       // parenthesized expression
       assert(term.length === 3 && term[2].value === ')');
@@ -312,12 +334,38 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
     const variableKind = variable.kind;
     const variableIndex = variable.index;
 
-    const expr = statementContent[3].content;
+    if (statementContent[2].value === '[') {
+      assert(statementContent[1].type === 'Array' && statementContent[4].value === ']');
+      const arrayOffsetExpression = statementContent[3].content;
+      const rhsExpression = statementContent[6].content;
 
-    return _.flatten([
-      writeExpression(expr),
-      writePop(variableKind, variableIndex)
-    ]);
+      return _.flatten([
+        // Add offset to array base address
+        writePush(variableKind, variableIndex),
+        writeExpression(arrayOffsetExpression),
+        writeBinaryOp('+'), // now destination address is top of stack
+
+        // save right-hand side value to temp 0
+        writeExpression(rhsExpression),
+        writePop('temp', 0),
+
+        // pop destination address to that pointer
+        writePop('pointer', 1),
+
+        // push right-hand-side value back onto stack and pop into the array index
+        writePush('temp', 0),
+        writePop('that', 0)
+      ]);
+    } else {
+      // TODO: NEED TO handle array set
+
+      const expr = statementContent[3].content;
+
+      return _.flatten([
+        writeExpression(expr),
+        writePop(variableKind, variableIndex)
+      ]);
+    }
   }
 
   function writeIfStatement(statementContent): Array<string> {
