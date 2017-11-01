@@ -92,7 +92,11 @@ function parse(tokens) {
         currentClassSymbolTable = symbolTable(token.value);
       } else if (category === 'subroutine') {
         currentSubroutineSymbolTable = symbolTable(token.value);
-        //currentClassSymbolTable.add(token.value, mostRecentSubroutineType.value, category);
+
+        // kinda hacky but it's ok because it's never used
+        if (mostRecentSubroutineType.value === 'method') {
+          currentSubroutineSymbolTable.add('this', 'object', 'argument');
+        }
       } else if (category === 'static' || category === 'field') {
         currentClassSymbolTable.add(token.value, mostRecentTypeDefinition, category);
       } else {
