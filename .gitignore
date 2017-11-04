@@ -8,6 +8,7 @@
 08/*.asm
 08/*.vm
 11/*/*.vm
+12/*/*.vm
 programs/node_modules
 programs/.flowconfig
 programs/lib

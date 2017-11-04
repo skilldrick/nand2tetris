@@ -293,7 +293,7 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
   function writeBinaryExpression(expr): Array<string> {
     return _.flatten([
       writeTerm(expr[0].content),
-      writeTerm(expr[2].content),
+      writeExpression(expr[2].content),
       writeBinaryOp(expr[1].value)
     ]);
   }
