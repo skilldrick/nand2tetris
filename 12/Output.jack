@@ -18,9 +18,17 @@ class Output {
 
     // Character map for displaying characters
     static Array charMaps; 
+    static int baseAddress;
+    static int column, row;
+
 
     /** Initializes the screen, and locates the cursor at the screen's top-left. */
     function void init() {
+      do Output.initMap();
+      let baseAddress = 16384;
+      let column = 0;
+      let row = 0;
+      return;
     }
 
     // Initializes the character map array
@@ -181,6 +189,28 @@ class Output {
     /** Displays the given character at the cursor location,
      *  and advances the cursor one column forward. */
     function void printChar(char c) {
+      var Array a;
+      var int i, oddOffset, current, m;
+
+      let a = Output.getMap(c);
+      let i = 0;
+
+      if ((column % 2) = 1) {
+        let oddOffset = 256;
+      } else {
+        let oddOffset = 1;
+      }
+
+      while (i < 11) {
+        let m = (i * 32) + (row * 512) + baseAddress + (column / 2);
+        let current = Memory.peek(m);
+        do Memory.poke(m, current | (a[i] * oddOffset));
+        let i = i + 1;
+      }
+
+      let column = column + 1;
+
+      return;
     }
 
     /** displays the given string starting at the cursor location,

@@ -10,7 +10,12 @@ class Main {
      *  methods of the Output class. */
     function void main() {
         var String s;
+        do Output.printChar(48);
+        do Output.printChar(49);
+        do Output.printChar(50);
+        do Output.printChar(51);
     
+/*
     	let s = String.new(1);
     	do s.appendChar(String.doubleQuote());
     
@@ -37,6 +42,7 @@ class Main {
         do Output.backSpace();
         do Output.printInt(6789);
         
+*/
         return;
     }
 }
