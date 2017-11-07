@@ -4,7 +4,7 @@ const _ = require('lodash');
 
 function parse(tokens) {
   const unaryOperators = ['-', '~'];
-  const binaryOperators = ['+', '-', '*', '/', '&', '|', '<', '>', '='];
+  const binaryOperators = ['+', '-', '*', '/', '%', '&', '|', '<', '>', '='];
   const returnTypes = ['void', 'int', 'char', 'boolean'];
 
   let i = 0;

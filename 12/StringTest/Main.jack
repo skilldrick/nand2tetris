@@ -23,14 +23,14 @@ class Main {
         do Output.printString("new,appendChar: ");
         do Output.printString(s);                // new, appendChar: abcde
         do Output.println();
-    
+
         let i = String.new(6);
-        do i.setInt(12345);
+        do i.setInt(12345, false);
         do Output.printString("setInt: ");
         do Output.printString(i);                // setInt: 12345
         do Output.println();
 
-        do i.setInt(-32767);
+        do i.setInt(-32767, false);
         do Output.printString("setInt: ");
         do Output.printString(i);                // setInt: -32767
         do Output.println();

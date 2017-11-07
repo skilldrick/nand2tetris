@@ -43,6 +43,7 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
   const nonBuiltInOperators = {
     '*': 'Math.multiply',
     '/': 'Math.divide',
+    '%': 'String.mod'
   };
 
   const booleans = ['true', 'false'];
@@ -301,7 +302,7 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
   function writeBinaryExpressionWithFunc(expr): Array<string> {
     return _.flatten([
       writeTerm(expr[0].content),
-      writeTerm(expr[2].content),
+      writeExpression(expr[2].content),
       writeCall(nonBuiltInOperators[expr[1].value], 2)
     ]);
   }
