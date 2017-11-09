@@ -79,7 +79,7 @@ class Output {
         do Output.create(64,30,51,51,59,59,59,27,3,30,0,0);  // @
         do Output.create(63,30,51,51,24,12,12,0,12,12,0,0);  // ?
 
-        do Output.create(65,0,0,0,0,0,0,0,0,0,0,0);          // A ** TO BE FILLED **
+        do Output.create(65,12,30,51,51,63,51,51,51,51,0,0); // A
         do Output.create(66,31,51,51,51,31,51,51,51,31,0,0); // B
         do Output.create(67,28,54,35,3,3,3,35,54,28,0,0);    // C
         do Output.create(68,15,27,51,51,51,51,51,27,15,0,0); // D
@@ -184,31 +184,48 @@ class Output {
     /** Moves the cursor to the j-th column of the i-th row,
      *  and erases the character displayed there. */
     function void moveCursor(int i, int j) {
+      let row = i;
+      let column = j;
+      return;
     }
 
     /** Displays the given character at the cursor location,
      *  and advances the cursor one column forward. */
     function void printChar(char c) {
       var Array a;
-      var int i, oddOffset, current, m;
+      var int i, oddOffset, evenOffset, current, m;
 
       let a = Output.getMap(c);
       let i = 0;
 
       if ((column % 2) = 1) {
         let oddOffset = 256;
+        let evenOffset = 1;
       } else {
         let oddOffset = 1;
+        let evenOffset = 256;
       }
 
       while (i < 11) {
-        let m = (i * 32) + (row * 512) + baseAddress + (column / 2);
-        let current = Memory.peek(m);
+        let m = (i * 32) + (row * 32 * 11) + baseAddress + 32 + (column / 2);
+
+        if (m > 24575) {
+          return;
+        }
+
+        let current = Memory.peek(m) & (63 * evenOffset); // mask out other character
         do Memory.poke(m, current | (a[i] * oddOffset));
         let i = i + 1;
       }
 
       let column = column + 1;
+      if (column > 63) {
+        do Output.println();
+      }
+
+      if (row > 22) {
+        let row = 0;
+      }
 
       return;
     }
@@ -216,18 +233,37 @@ class Output {
     /** displays the given string starting at the cursor location,
      *  and advances the cursor appropriately. */
     function void printString(String s) {
+      var int i;
+      let i = 0;
+
+      while (i < s.length()) {
+        do Output.printChar(s.charAt(i));
+        let i = i + 1;
+      }
+
+      return;
     }
 
     /** Displays the given integer starting at the cursor location,
      *  and advances the cursor appropriately. */
     function void printInt(int i) {
+      var String s;
+      let s = String.new(20);
+      do s.setInt(i);
+      do Output.printString(s);
+      return;
     }
 
     /** Advances the cursor to the beginning of the next line. */
     function void println() {
+      let column = 0;
+      let row = row + 1;
+      return;
     }
 
     /** Moves the cursor one column back. */
     function void backSpace() {
+      let column = column - 1;
+      return;
     }
 }
