@@ -82,9 +82,13 @@ class Screen {
   /** Draws a line from pixel (x1,y1) to pixel (x2,y2), using the current color. */
   function void drawLine(int x1, int y1, int x2, int y2) {
     if (y1 = y2) {
-      do Screen.drawHorizontalLine(x1, x2, y1);
+      do Screen.drawHorizontalLine(Math.min(x1, x2), Math.max(x1, x2), y1);
     } else {
-      do Screen.drawDiagonalLine(x1, y1, x2, y2);
+      if (y1 < y2) {
+        do Screen.drawDiagonalLine(x1, y1, x2, y2);
+      } else {
+        do Screen.drawDiagonalLine(x2, y2, x1, y1);
+      }
     }
     return;
   }
@@ -95,15 +99,20 @@ class Screen {
     let a = 0;
     let b = 0;
     let diff = 0;
-    let dx = (x2 - x1);
-    let dy = (y2 - y1);
+    let dx = Math.abs(x2 - x1);
+    let dy = Math.abs(y2 - y1);
 
     while ((a < (dx + 1)) & (b < (dy + 1))) {
       do Screen.drawPixel(x1 + a, y1 + b);
 
       if (diff < 0) {
-        let a = a + 1;
-        let diff = diff + dy;
+        if (x1 < x2) {
+          let a = a + 1;
+          let diff = diff + dy;
+        } else {
+          let a = a - 1;
+          let diff = diff + dy;
+        }
       } else {
         let b = b + 1;
         let diff = diff - dx;
@@ -146,5 +155,19 @@ class Screen {
 
   /** Draws a filled circle of radius r<=181 around (x,y), using the current color. */
   function void drawCircle(int x, int y, int r) {
+    var int dy, sqrtr2dy2, x1, x2, y1;
+
+    let dy = -r;
+
+    while (dy < r) {
+      let sqrtr2dy2 = Math.sqrt((r * r) - (dy * dy));
+      let x1 = x - sqrtr2dy2;
+      let x2 = x + sqrtr2dy2;
+      let y1 = y + dy;
+      do Screen.drawLine(x1, y1, x2, y1);
+      let dy = dy + 1;
+    }
+
+    return;
   }
 }
