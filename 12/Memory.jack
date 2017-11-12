@@ -9,26 +9,118 @@
  * consists of 32,768 words, each holding a 16-bit binary number.
  */ 
 class Memory {
+  static Array mem;
+  static Array heap;
+  static Int freeList;
 
-    /** Initializes the class. */
-    function void init() {
+  /** Initializes the class. */
+  function void init() {
+    let mem = 0;
+    let heap = 2048;
+    let freeList = 2048;
+
+    let heap[0] = 0; // next
+    let heap[1] = 14334; // length
+
+    return;
+  }
+
+  /** Returns the RAM value at the given address. */
+  function int peek(int address) {
+    return mem[address];
+  }
+
+  /** Sets the RAM value at the given address to the given value. */
+  function void poke(int address, int value) {
+    let mem[address] = value;
+    return;
+  }
+
+  /*
+  let a = Array.new(3);
+  let a[0] = 10;
+  let a[1] = 20;
+  let a[2] = 30;
+
+  let b = Array.new(5);
+  let b[0] = 40;
+
+  let c = Array.new(3);
+  let c[0] = 50;
+
+  do a.dispose();
+  do b.dispose();
+
+  let a = Array.new(2);
+  let a[0] = 123;
+
+  // If we set initial memory length to 18:
+  2048: 2063
+  2049: 1
+  2050
+  2051: 0  //c
+  2052: 3
+  2053: 50
+  2054
+  2055
+  2056: 0  //b
+  2057: 5
+  2058: 40
+  2059: 0
+  2060: 2
+  2061: 123
+  2062: 0
+  2063: 2056 //a
+  2064: 3
+  2065: 10
+  2066: 20
+  2067: 30
+  */
+
+  function int alloc(int size) {
+    var Array addr, freeSegment;
+    var int sizeWithOverhead;
+
+    let sizeWithOverhead = size + 2;
+
+    let freeSegment = freeList;
+
+    // Find a segment in the freelist with enough space.
+    while (freeSegment[1] < sizeWithOverhead) {
+      let freeSegment = freeSegment[0]; // follow the `next` pointer
+
+      if (freeSegment = 0) { // Out of memory
+        do Output.printInt(-1);
+        do Sys.halt();
+      }
     }
 
-    /** Returns the RAM value at the given address. */
-    function int peek(int address) {
+    // This segment address + 2 for the overhead of this segment + the size
+    // then - the size of the allocated segment
+    let addr = ((freeSegment + 2) + freeSegment[1]) - sizeWithOverhead;
+
+    // initialize new segment metadata
+    let addr[0] = 0;
+    let addr[1] = size;
+
+    // Subtract size of new segment from size of current segment
+    let freeSegment[1] = freeSegment[1] - sizeWithOverhead;
+
+    return addr + 2; // return base address of memory in new segment
+  }
+
+  function void deAlloc(Array o) {
+    var Array lastFreeAddr;
+
+    let lastFreeAddr = freeList;
+
+    while (lastFreeAddr[0] > 0) { // last block has a 0 pointer
+      let lastFreeAddr = lastFreeAddr[0]; // follow the `next` pointer
     }
 
-    /** Sets the RAM value at the given address to the given value. */
-    function void poke(int address, int value) {
-    }
+    // set the next pointer of the last segment to point to the metadata for o
+    let lastFreeAddr[0] = o - 2;
 
-    /** Finds an available RAM block of the given size and returns
-     *  a reference to its base address. */
-    function int alloc(int size) {
-    }
-
-    /** De-allocates the given object (cast as an array) by making
-     *  it available for future allocations. */
-    function void deAlloc(Array o) {
-    }    
+    return;
+  }
 }

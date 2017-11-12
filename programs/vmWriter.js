@@ -105,10 +105,16 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
   }
 
   function writePush(segment, index): string {
+    if (index == null) {
+      throw new Error("Index is undefined");
+    }
     return ["push", convertSegment(segment), index].join(" ");
   }
 
   function writePop(segment, index): string {
+    if (index == null) {
+      throw new Error("Index is undefined");
+    }
     return ["pop", convertSegment(segment), index].join(" ");
   }
 
@@ -281,6 +287,9 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
       assert(term.length === 4);
       return writeMethodCallWithoutObject(term);
     } else if (term[0].kind) {
+      if (term[0].index == null) {
+        throw new Error("No index for term " + JSON.stringify(term[0]));
+      }
       return [
         writePush(term[0].kind, term[0].index)
       ];
@@ -358,8 +367,6 @@ function vmWriter(parseTree: {}, className: string): Array<string> {
         writePop('that', 0)
       ]);
     } else {
-      // TODO: NEED TO handle array set
-
       const expr = statementContent[3].content;
 
       return _.flatten([
